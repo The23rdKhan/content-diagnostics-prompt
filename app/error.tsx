@@ -12,6 +12,7 @@ export default function AppError({
   reset: () => void
 }) {
   const isAuthError = error.name === "AuthenticationError"
+  const isAccessDenied = error.message === "Access denied."
 
   useEffect(() => {
     console.error(error)
@@ -23,8 +24,10 @@ export default function AppError({
         <h1 className="text-2xl font-semibold text-card-foreground">Something went wrong</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {isAuthError
-            ? "Your session expired or you don't have access. Please sign in again."
-            : "Please try again. If the problem persists, contact support."}
+            ? "Your session expired. Please sign in again."
+            : isAccessDenied
+              ? "Access denied. You do not have permission to view this page."
+              : "Please try again. If the problem persists, contact support."}
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <Button onClick={() => reset()}>Try again</Button>

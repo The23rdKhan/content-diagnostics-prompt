@@ -30,6 +30,8 @@ interface ApiRequestOptions extends RequestInit {
   _networkRetried?: boolean
 }
 
+const RETRYABLE_STATUS_CODES = new Set([502, 503, 504])
+
 /**
  * Core fetch function with auth handling.
  *
@@ -69,7 +71,7 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
     throw err
   }
 
-  if (response.status >= 500 && shouldRetryNetwork && !options._networkRetried) {
+  if (shouldRetryNetwork && !options._networkRetried && RETRYABLE_STATUS_CODES.has(response.status)) {
     await new Promise((resolve) => setTimeout(resolve, 250))
     return request<T>(path, { ...options, _networkRetried: true })
   }
@@ -86,17 +88,27 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
     // Refresh failed - clear state and throw
     authStore.clear()
     if (typeof window !== "undefined") {
-      window.location.assign("/auth/sign-in")
+      window.location.assign("/auth/sign-in?reason=session-expired")
     }
     throw new AuthenticationError("Session expired. Please sign in again.")
   }
 
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     authStore.clear()
     if (typeof window !== "undefined") {
-      window.location.assign("/auth/sign-in")
+      window.location.assign("/auth/sign-in?reason=session-expired")
     }
-    throw new AuthenticationError(response.status === 403 ? "Access denied." : "Session expired. Please sign in again.")
+    throw new AuthenticationError("Session expired. Please sign in again.")
+  }
+
+  if (response.status === 403) {
+    throw new ApiRequestError(
+      {
+        code: "FORBIDDEN",
+        message: "Access denied.",
+      },
+      response.status
+    )
   }
 
   // Parse response

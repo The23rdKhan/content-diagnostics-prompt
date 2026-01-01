@@ -29,10 +29,13 @@ export function ReviewStatusSection() {
 
   // Error state
   if (error) {
+    const message = error.message === "Access denied."
+      ? "Access denied. You do not have permission to view jobs."
+      : "Failed to load jobs"
     return (
       <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-center">
         <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
-        <p className="mt-2 text-destructive">Failed to load jobs</p>
+        <p className="mt-2 text-destructive">{message}</p>
         <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
           Try Again
         </Button>

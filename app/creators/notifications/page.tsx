@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty"
 import { useNotifications, type CreatorNotificationType } from "@/lib/notification-context"
 import { trackEvent } from "@/lib/analytics"
 import Link from "next/link"
@@ -121,12 +122,18 @@ export default function CreatorNotificationsPage() {
 
         {/* Notifications List */}
         {filteredNotifications.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Bell className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-            <h2 className="mb-2 text-lg font-semibold">No notifications</h2>
-            <p className="text-sm text-muted-foreground">
-              {activeTab === "unread" ? "You're all caught up!" : "You haven't received any notifications yet."}
-            </p>
+          <Card className="p-6">
+            <Empty>
+              <EmptyMedia variant="icon">
+                <Bell className="h-5 w-5" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>No notifications</EmptyTitle>
+                <EmptyDescription>
+                  {activeTab === "unread" ? "You're all caught up!" : "You haven't received any notifications yet."}
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           </Card>
         ) : (
           <div className="space-y-2">

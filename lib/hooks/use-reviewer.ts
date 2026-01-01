@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { useApi } from "./use-api"
-import { api } from "@/lib/api"
+import { api, ApiRequestError, AuthenticationError } from "@/lib/api"
 import type { TaskDto, TaskStatus, EarningsResponse, ReviewerProfile } from "@/lib/types/api"
 
 // =============================================================================
@@ -127,11 +127,12 @@ export function useTaskActions() {
       const result = await api.post<TaskDto>(`/reviewer/tasks/${taskId}/accept`)
       return result
     } catch (err: unknown) {
-      const apiError = err as { status?: number; message?: string }
-      const status = apiError.status ?? 500
+      const status = err instanceof ApiRequestError ? err.status ?? 500 : err instanceof AuthenticationError ? 401 : 500
       const message = status === 409
         ? "This task has already been accepted by another reviewer."
-        : apiError.message ?? "Failed to accept task"
+        : err instanceof Error
+          ? err.message
+          : "Failed to accept task"
 
       setError({ status, message })
       throw err
@@ -151,10 +152,10 @@ export function useTaskActions() {
       const result = await api.post<TaskDto>(`/reviewer/tasks/${taskId}/submit`, payload)
       return result
     } catch (err: unknown) {
-      const apiError = err as { status?: number; message?: string }
+      const status = err instanceof ApiRequestError ? err.status ?? 500 : err instanceof AuthenticationError ? 401 : 500
       setError({
-        status: apiError.status ?? 500,
-        message: apiError.message ?? "Failed to submit task",
+        status,
+        message: err instanceof Error ? err.message : "Failed to submit task",
       })
       throw err
     } finally {
@@ -170,10 +171,10 @@ export function useTaskActions() {
       const result = await api.post<TaskDto>(`/reviewer/tasks/${taskId}/release`)
       return result
     } catch (err: unknown) {
-      const apiError = err as { status?: number; message?: string }
+      const status = err instanceof ApiRequestError ? err.status ?? 500 : err instanceof AuthenticationError ? 401 : 500
       setError({
-        status: apiError.status ?? 500,
-        message: apiError.message ?? "Failed to release task",
+        status,
+        message: err instanceof Error ? err.message : "Failed to release task",
       })
       throw err
     } finally {

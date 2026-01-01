@@ -3,12 +3,14 @@
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AlertCircle, XCircle, Filter, RefreshCw, AlertTriangle } from "lucide-react"
+import { AlertCircle, XCircle, Filter, RefreshCw } from "lucide-react"
 import { useReviewerTasks, useReviewerProfile, useTaskActions, useReviewerEarnings } from "@/lib/hooks/use-reviewer"
 import type { TaskDto, TaskStatus } from "@/lib/types/api"
 import { trackEvent } from "@/lib/analytics"
 import { TaskCompletionModal } from "./task-completion-modal"
 import { TaskCard } from "./task-card"
+import { toast } from "@/components/ui/use-toast"
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
 
 type FilterType = "all" | "available" | "in-progress" | "submitted" | "qc-pending" | "approved" | "rejected"
 
@@ -40,7 +42,6 @@ export function TaskQueueSection() {
   const [activeTask, setActiveTask] = useState<TaskDto | null>(null)
   const [showAcceptModal, setShowAcceptModal] = useState<TaskDto | null>(null)
   const [showQualityWarning, setShowQualityWarning] = useState(false)
-  const [showConflictError, setShowConflictError] = useState(false)
   const [pendingAcceptId, setPendingAcceptId] = useState<number | null>(null)
 
   // Sync API tasks to local state
@@ -101,11 +102,14 @@ export function TaskQueueSection() {
   // Handle 409 conflict errors
   useEffect(() => {
     if (actionError?.status === 409) {
-      setShowConflictError(true)
-      // Refresh tasks to get updated state
+      toast({
+        title: "Task already taken",
+        description: "Another reviewer accepted this task. We refreshed the queue for you.",
+      })
       refetchTasks()
+      clearActionError()
     }
-  }, [actionError, refetchTasks])
+  }, [actionError, clearActionError, refetchTasks])
 
   const handleAcceptTask = (task: TaskDto) => {
     setShowAcceptModal(task)
@@ -271,12 +275,15 @@ export function TaskQueueSection() {
 
   // Error state
   if (error) {
+    const message = error.message === "Access denied."
+      ? "Access denied. You do not have permission to view these tasks."
+      : "Unable to fetch task data. Please try again."
     return (
       <div className="rounded-xl border border-destructive bg-destructive/5 p-6 text-center">
         <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
         <h2 className="mt-4 text-xl font-bold text-destructive">Failed to Load Tasks</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Unable to fetch task data. Please try again.
+          {message}
         </p>
         <Button className="mt-4" onClick={() => refetchTasks()}>
           <RefreshCw className="mr-2 h-4 w-4" />
@@ -288,29 +295,6 @@ export function TaskQueueSection() {
 
   return (
     <div className="space-y-6">
-      {/* Conflict Error Banner */}
-      {showConflictError && (
-        <div className="rounded-xl border border-yellow-500 bg-yellow-500/5 p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <h3 className="font-semibold text-yellow-600 dark:text-yellow-500">Task Already Taken</h3>
-              <p className="mt-1 text-sm text-yellow-600/80 dark:text-yellow-500/80">
-                This task was accepted by another reviewer. The task list has been refreshed.
-              </p>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="mt-3 text-yellow-600 dark:text-yellow-500"
-                onClick={() => setShowConflictError(false)}
-              >
-                Dismiss
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Quality Warning */}
       {showQualityWarning && qualityProfile.score < 70 && (
         <div className="rounded-xl border border-red-500 bg-red-500/5 p-4">
@@ -454,7 +438,14 @@ export function TaskQueueSection() {
         </div>
         <div className="divide-y divide-border">
           {filteredTasks.length === 0 ? (
-            <div className="p-12 text-center text-muted-foreground">No tasks in this category</div>
+            <div className="p-6">
+              <Empty>
+                <EmptyHeader>
+                  <EmptyTitle>No tasks right now</EmptyTitle>
+                  <EmptyDescription>Check back soon for new assignments.</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            </div>
           ) : (
             filteredTasks.map((task) => (
               <TaskCard

@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { BarChart3, Download, Eye, TrendingUp, TrendingDown, Minus, AlertCircle } from "lucide-react"
 import { useCreatorReports } from "@/lib/hooks/use-creator"
 import type { ReportDto } from "@/lib/types/api"
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
 
 export function ReportsSection() {
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null)
@@ -48,10 +49,13 @@ export function ReportsSection() {
 
   // Error state
   if (error) {
+    const message = error.message === "Access denied."
+      ? "Access denied. You do not have permission to view reports."
+      : "Failed to load reports"
     return (
       <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-center">
         <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
-        <p className="mt-2 text-destructive">Failed to load reports</p>
+        <p className="mt-2 text-destructive">{message}</p>
         <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
           Try Again
         </Button>
@@ -85,8 +89,13 @@ export function ReportsSection() {
               <h2 className="text-lg font-semibold text-card-foreground">Completed Reports</h2>
             </div>
             {reports.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                No reports yet. Upload a video to get started.
+              <div className="p-6">
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyTitle>No reports yet</EmptyTitle>
+                    <EmptyDescription>Upload a video to get started.</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
               </div>
             ) : (
               <div className="divide-y divide-border">
