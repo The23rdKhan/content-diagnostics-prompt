@@ -65,10 +65,6 @@ The application uses React Context for cross-cutting concerns:
 ### Data Layer
 
 Mock data is currently stored in `/lib/*-data.ts` files:
-- `admin-data.ts` - Admin dashboard metrics and user data
-- `job-data.ts` - Creator job submissions and status
-- `reports-data.ts` - Diagnostic reports and review data
-- `task-data.ts` - Reviewer tasks and queue management
 
 When implementing real backend integration, replace these mock data files with API calls.
 
