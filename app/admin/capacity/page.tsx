@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,18 +8,27 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { languagePools } from "@/lib/admin-data"
-import type { LanguagePool } from "@/lib/admin-data"
+import { useAdminCapacity } from "@/lib/hooks/use-admin"
+import type { LanguagePoolCapacity } from "@/lib/types/api"
 import { trackEvent } from "@/lib/analytics"
-import { Settings, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { Settings, AlertTriangle, CheckCircle2, RefreshCw, AlertCircle } from "lucide-react"
 
 export default function CapacityPage() {
-  const [pools, setPools] = useState(languagePools)
-  const [editingPool, setEditingPool] = useState<LanguagePool | null>(null)
+  const { capacity, loading, error, refetch } = useAdminCapacity()
+  const [localPools, setLocalPools] = useState<LanguagePoolCapacity[]>([])
+  const [editingPool, setEditingPool] = useState<LanguagePoolCapacity | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  const handleEditPool = (pool: LanguagePool) => {
+  // Sync API data to local state
+  useEffect(() => {
+    if (capacity?.languagePools) {
+      setLocalPools(capacity.languagePools)
+    }
+  }, [capacity])
+
+  const handleEditPool = (pool: LanguagePoolCapacity) => {
     setEditingPool({ ...pool })
     setSheetOpen(true)
   }
@@ -27,7 +36,7 @@ export default function CapacityPage() {
   const handleSavePool = () => {
     if (!editingPool) return
 
-    setPools(pools.map((p) => (p.id === editingPool.id ? editingPool : p)))
+    setLocalPools(localPools.map((p) => (p.id === editingPool.id ? editingPool : p)))
     trackEvent("admin_capacity_changed", {
       poolId: editingPool.id,
       sla: editingPool.currentSLA,
@@ -35,6 +44,7 @@ export default function CapacityPage() {
       checkoutEnabled: editingPool.checkoutEnabled,
     })
     setSheetOpen(false)
+    // In a real implementation, this would call an API to persist the changes
   }
 
   const getCapacityBadge = (score: number) => {
@@ -43,6 +53,26 @@ export default function CapacityPage() {
     if (score >= 50)
       return { label: "Fair", variant: "secondary" as const, color: "text-amber-600 dark:text-amber-400" }
     return { label: "Low", variant: "destructive" as const, color: "text-red-600 dark:text-red-400" }
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <p>Failed to load capacity data. Please try again.</p>
+            </div>
+            <Button variant="outline" className="mt-4" onClick={refetch}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -73,48 +103,75 @@ export default function CapacityPage() {
                 </tr>
               </thead>
               <tbody>
-                {pools.map((pool) => {
-                  const capacityBadge = getCapacityBadge(pool.capacityScore)
-                  return (
-                    <tr key={pool.id} className="border-b border-border hover:bg-accent/10">
+                {loading ? (
+                  [...Array(5)].map((_, i) => (
+                    <tr key={i} className="border-b border-border">
                       <td className="py-3 px-4">
-                        <div className="font-medium text-foreground">{pool.name}</div>
-                        <div className="text-sm text-muted-foreground">{pool.code}</div>
+                        <Skeleton className="h-5 w-32" />
+                        <Skeleton className="h-4 w-16 mt-1" />
                       </td>
+                      <td className="py-3 px-4"><Skeleton className="h-8 w-20" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-12" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-8" /></td>
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-2xl font-bold ${capacityBadge.color}`}>{pool.capacityScore}</span>
-                          <Badge variant={capacityBadge.variant}>{capacityBadge.label}</Badge>
-                        </div>
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="h-4 w-16 mt-1" />
                       </td>
-                      <td className="py-3 px-4 text-foreground">{pool.currentSLA}</td>
-                      <td className="py-3 px-4 text-foreground">{pool.maxReviewersPerVideo}</td>
-                      <td className="py-3 px-4">
-                        <div className="text-foreground">{pool.activeReviewers} reviewers</div>
-                        <div className="text-sm text-muted-foreground">{pool.tasksToday} tasks</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        {pool.checkoutEnabled ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <AlertTriangle className="h-5 w-5 text-red-600" />
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        {pool.liveAddOnEnabled ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <AlertTriangle className="h-5 w-5 text-red-600" />
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Button variant="ghost" size="sm" onClick={() => handleEditPool(pool)}>
-                          <Settings className="h-4 w-4" />
-                        </Button>
-                      </td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-5" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-5" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-8 w-8" /></td>
                     </tr>
-                  )
-                })}
+                  ))
+                ) : localPools.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                      No language pools configured
+                    </td>
+                  </tr>
+                ) : (
+                  localPools.map((pool) => {
+                    const capacityBadge = getCapacityBadge(pool.capacityScore)
+                    return (
+                      <tr key={pool.id} className="border-b border-border hover:bg-accent/10">
+                        <td className="py-3 px-4">
+                          <div className="font-medium text-foreground">{pool.name}</div>
+                          <div className="text-sm text-muted-foreground">{pool.code}</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-2xl font-bold ${capacityBadge.color}`}>{pool.capacityScore}</span>
+                            <Badge variant={capacityBadge.variant}>{capacityBadge.label}</Badge>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-foreground">{pool.currentSLA}</td>
+                        <td className="py-3 px-4 text-foreground">{pool.maxReviewersPerVideo}</td>
+                        <td className="py-3 px-4">
+                          <div className="text-foreground">{pool.activeReviewers} reviewers</div>
+                          <div className="text-sm text-muted-foreground">{pool.pendingTasks} pending</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {pool.checkoutEnabled ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <AlertTriangle className="h-5 w-5 text-red-600" />
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {pool.liveAddOnEnabled ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <AlertTriangle className="h-5 w-5 text-red-600" />
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditPool(pool)}>
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>

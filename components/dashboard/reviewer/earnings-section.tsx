@@ -1,25 +1,39 @@
 "use client"
 
-import { DollarSign, TrendingUp, Clock, CheckCircle } from "lucide-react"
-
-const weeklyEarnings = [
-  { day: "Mon", amount: 2.4 },
-  { day: "Tue", amount: 3.1 },
-  { day: "Wed", amount: 1.8 },
-  { day: "Thu", amount: 4.2 },
-  { day: "Fri", amount: 2.9 },
-  { day: "Sat", amount: 1.5 },
-  { day: "Sun", amount: 0.6 },
-]
-
-const maxEarning = Math.max(...weeklyEarnings.map((d) => d.amount))
+import { DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, RefreshCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useReviewerEarnings } from "@/lib/hooks/use-reviewer"
 
 export function EarningsSection() {
-  const totalWeek = weeklyEarnings.reduce((sum, d) => sum + d.amount, 0)
+  const { earnings, loading, error, refetch } = useReviewerEarnings()
 
-  const pendingQC = 2.8 // Tasks in QC_PENDING state
-  const available = 42.3 // Approved tasks, ready for payout
-  const paid = 156.8 // Already paid out
+  // Derive values from API response
+  const pendingQC = earnings?.pendingEarnings ?? 0
+  const available = earnings?.availableForPayout ?? 0
+  const totalMonth = earnings?.earningsThisMonth ?? 0
+  const totalPaid = earnings?.totalEarnings ?? 0
+  const recentEarnings = earnings?.recentEarnings ?? []
+
+  // Calculate max earning for chart scaling
+  const maxEarning = Math.max(...recentEarnings.map((d) => d.amount), 1)
+
+  // Error state
+  if (error) {
+    return (
+      <div className="rounded-xl border border-destructive bg-destructive/5 p-6 text-center">
+        <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
+        <h2 className="mt-4 text-xl font-bold text-destructive">Failed to Load Earnings</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Unable to fetch earnings data. Please try again.
+        </p>
+        <Button className="mt-4" onClick={() => refetch()}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Retry
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -29,7 +43,11 @@ export function EarningsSection() {
             <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
             <p className="text-sm text-muted-foreground">Pending QC</p>
           </div>
-          <p className="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-500">${pendingQC.toFixed(2)}</p>
+          {loading ? (
+            <Skeleton className="mt-1 h-8 w-20" />
+          ) : (
+            <p className="mt-1 text-2xl font-bold text-yellow-600 dark:text-yellow-500">${pendingQC.toFixed(2)}</p>
+          )}
           <p className="mt-1 text-xs text-muted-foreground">24-48 hour hold</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
@@ -37,22 +55,34 @@ export function EarningsSection() {
             <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
             <p className="text-sm text-muted-foreground">Available</p>
           </div>
-          <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-500">${available.toFixed(2)}</p>
+          {loading ? (
+            <Skeleton className="mt-1 h-8 w-20" />
+          ) : (
+            <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-500">${available.toFixed(2)}</p>
+          )}
           <p className="mt-1 text-xs text-muted-foreground">Ready for payout</p>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-accent" />
-            <p className="text-sm text-muted-foreground">This Week</p>
+            <p className="text-sm text-muted-foreground">This Month</p>
           </div>
-          <p className="mt-1 text-2xl font-bold text-accent">${totalWeek.toFixed(2)}</p>
+          {loading ? (
+            <Skeleton className="mt-1 h-8 w-20" />
+          ) : (
+            <p className="mt-1 text-2xl font-bold text-accent">${totalMonth.toFixed(2)}</p>
+          )}
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Total Paid</p>
+            <p className="text-sm text-muted-foreground">Total Earnings</p>
           </div>
-          <p className="mt-1 text-2xl font-bold text-card-foreground">${paid.toFixed(2)}</p>
+          {loading ? (
+            <Skeleton className="mt-1 h-8 w-20" />
+          ) : (
+            <p className="mt-1 text-2xl font-bold text-card-foreground">${totalPaid.toFixed(2)}</p>
+          )}
         </div>
       </div>
 
@@ -85,60 +115,94 @@ export function EarningsSection() {
       </div>
 
       <div className="rounded-xl border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold text-card-foreground mb-6">Weekly Earnings</h2>
-        <div className="flex items-end justify-between gap-2 h-40">
-          {weeklyEarnings.map((day) => (
-            <div key={day.day} className="flex-1 flex flex-col items-center gap-2">
-              <div className="w-full relative flex-1 flex items-end justify-center">
-                <div
-                  className="w-full max-w-8 rounded-t bg-accent transition-all"
-                  style={{ height: `${(day.amount / maxEarning) * 100}%`, minHeight: "4px" }}
-                />
+        <h2 className="text-lg font-semibold text-card-foreground mb-6">Recent Earnings</h2>
+        {loading ? (
+          <div className="flex items-end justify-between gap-2 h-40">
+            {[...Array(7)].map((_, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                <Skeleton className="w-full max-w-8 h-20" />
+                <Skeleton className="h-4 w-8" />
+                <Skeleton className="h-4 w-12" />
               </div>
-              <span className="text-xs text-muted-foreground">{day.day}</span>
-              <span className="text-xs font-medium text-foreground">${day.amount.toFixed(2)}</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : recentEarnings.length > 0 ? (
+          <div className="flex items-end justify-between gap-2 h-40">
+            {recentEarnings.slice(0, 7).map((day) => {
+              const shortDate = new Date(day.date).toLocaleDateString("en-US", { weekday: "short" })
+              return (
+                <div key={day.date} className="flex-1 flex flex-col items-center gap-2">
+                  <div className="w-full relative flex-1 flex items-end justify-center">
+                    <div
+                      className="w-full max-w-8 rounded-t bg-accent transition-all"
+                      style={{ height: `${(day.amount / maxEarning) * 100}%`, minHeight: "4px" }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground">{shortDate}</span>
+                  <span className="text-xs font-medium text-foreground">${day.amount.toFixed(2)}</span>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="h-40 flex items-center justify-center text-muted-foreground">
+            No recent earnings data
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold text-card-foreground mb-4">Earnings Breakdown</h2>
+        <h2 className="text-lg font-semibold text-card-foreground mb-4">Balance Summary</h2>
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Video Review Tasks</span>
-            <span className="font-medium text-foreground">$38.40</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">Bonus Tasks</span>
-            <span className="font-medium text-foreground">$3.90</span>
-          </div>
-          <div className="h-px bg-border" />
-          <div className="flex items-center justify-between">
-            <span className="font-medium text-foreground">Total Available</span>
-            <span className="font-bold text-accent">${available.toFixed(2)}</span>
-          </div>
+          {loading ? (
+            <>
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-5 w-16" />
+              </div>
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-28" />
+                <Skeleton className="h-5 w-16" />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Pending QC Review</span>
+                <span className="font-medium text-yellow-600 dark:text-yellow-500">${pendingQC.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">This Month Earnings</span>
+                <span className="font-medium text-foreground">${totalMonth.toFixed(2)}</span>
+              </div>
+              <div className="h-px bg-border" />
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-foreground">Available for Payout</span>
+                <span className="font-bold text-accent">${available.toFixed(2)}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card p-6">
         <h2 className="text-lg font-semibold text-card-foreground mb-4">Payment History</h2>
         <div className="space-y-3">
-          {[
-            { date: "Dec 15, 2025", amount: "$50.00", status: "Completed" },
-            { date: "Dec 1, 2025", amount: "$45.50", status: "Completed" },
-            { date: "Nov 15, 2025", amount: "$19.00", status: "Completed" },
-          ].map((payment, index) => (
-            <div key={index} className="flex items-center justify-between rounded-lg bg-secondary p-3">
-              <div>
-                <p className="font-medium text-foreground">{payment.amount}</p>
-                <p className="text-sm text-muted-foreground">{payment.date}</p>
+          {loading ? (
+            [...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center justify-between rounded-lg bg-secondary p-3">
+                <div>
+                  <Skeleton className="h-5 w-20" />
+                  <Skeleton className="h-4 w-24 mt-1" />
+                </div>
+                <Skeleton className="h-6 w-20 rounded-full" />
               </div>
-              <span className="rounded-full bg-green-500/10 px-2 py-1 text-xs font-medium text-green-600 dark:text-green-500">
-                {payment.status}
-              </span>
+            ))
+          ) : (
+            <div className="text-center py-4 text-muted-foreground">
+              <p className="text-sm">Payment history will appear here once you request a payout.</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>

@@ -168,3 +168,198 @@ export class AuthenticationError extends Error {
     this.name = "AuthenticationError"
   }
 }
+
+// =============================================================================
+// Job Types (Creator Dashboard)
+// =============================================================================
+
+export type JobStatus =
+  | "UPLOADING"
+  | "UPLOADED"
+  | "PROCESSING"
+  | "SEGMENTED"
+  | "IN_REVIEW"
+  | "COMPILING"
+  | "DELIVERED"
+
+export type SlaStatus = "on-time" | "at-risk" | "delivered-early" | "delivered-late"
+
+export interface JobDto {
+  id: number
+  videoId: number
+  videoTitle: string
+  fileName: string
+  fileSize: number
+  status: JobStatus
+  language: string
+  slaHours: number
+  requiredReviewers: number
+  completedReviewers: number
+  totalReviewers: number
+  extraReviewers?: number
+  fasterDelivery: boolean
+  fullWatchSummary: boolean
+  liveFeedback: boolean
+  timeline: {
+    aiDiagnostics: "pending" | "complete"
+    humanReview: "pending" | "in-progress" | "complete"
+    compilingReport: "pending" | "in-progress" | "complete"
+  }
+  progress: {
+    reviewersCompleted: number
+    totalReviewers: number
+  }
+  slaStatus: SlaStatus
+  deliveryTimeHours?: number
+  estimatedDeliveryWindow?: string
+  createdAt: string
+  deliveredAt?: string
+}
+
+// =============================================================================
+// Report Types (Creator Dashboard)
+// =============================================================================
+
+export type ReportStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED"
+
+export interface ReportDto {
+  id: number
+  videoTitle: string
+  duration?: string
+  videoDurationMinutes?: number
+  languagePool: string
+  status: ReportStatus
+  guaranteedReviewers: number
+  slaWindow?: string
+  actualDeliveryTime?: string
+  dateSubmitted: string
+  dateCompleted?: string
+  aiComplete: boolean
+  humanComplete: boolean
+  compiled: boolean
+  clarityScore?: number
+  pacingScore?: number
+  engagementScore?: number
+  structureScore?: number
+  executiveSummary?: string
+  timelineInsights?: Array<{
+    timestamp: string
+    observation: string
+    severity: string
+    category: string
+  }>
+  aiAnalysis?: {
+    monologueStretches?: number
+    silenceDowntime?: number
+    topicDrift?: number
+    energyVariance?: number
+  }
+  humanReviews?: {
+    engagementStats?: Record<string, number>
+    comments?: string[]
+  }
+  actionPlan?: Array<{
+    action: string
+    why: string
+    expectedResult: string
+  }>
+}
+
+// =============================================================================
+// Task Types (Reviewer Dashboard)
+// =============================================================================
+
+export type TaskStatus =
+  | "AVAILABLE"
+  | "LEASED"
+  | "IN_PROGRESS"
+  | "SUBMITTED"
+  | "QC_PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "REQUEUED"
+
+export interface TaskQuestion {
+  id: string
+  question: string
+  type: "scale" | "choice" | "text" | "attention-check"
+  options?: string[]
+}
+
+export interface TaskDto {
+  id: number
+  status: TaskStatus
+  language: string
+  segmentTimestamp?: string
+  segmentDurationSeconds: number
+  payAmount: number
+  videoSegmentUrl?: string
+  questions: TaskQuestion[]
+  attentionCheckIndex?: number
+  leaseExpiresAt?: string
+  submittedAt?: string
+  reviewedAt?: string
+  rejectionReason?: string
+  createdAt: string
+}
+
+// =============================================================================
+// Earnings Types (Reviewer Dashboard)
+// =============================================================================
+
+export interface EarningsBreakdown {
+  date: string
+  tasksCompleted: number
+  amount: number
+}
+
+export interface EarningsResponse {
+  totalEarnings: number
+  pendingEarnings: number
+  availableForPayout: number
+  tasksCompletedThisMonth: number
+  earningsThisMonth: number
+  recentEarnings: EarningsBreakdown[]
+}
+
+// =============================================================================
+// Admin Types
+// =============================================================================
+
+export interface KpiResponse {
+  totalCreators: number
+  totalReviewers: number
+  activeReviewers: number
+  pendingTasks: number
+  tasksCompletedToday: number
+  jobsInProgress: number
+  jobsDeliveredToday: number
+  avgDeliveryTimeHours: number
+  slaComplianceRate: number
+  // Additional fields for admin dashboard
+  uploadsToday: number
+  segmentsToReview: number
+  reportsDelivered: number
+  slaMissCount: number
+  slaMissRate: number
+  reviewFailureRate: number
+  rejectedSubmissions: number
+}
+
+export interface LanguagePoolCapacity {
+  id: number
+  name: string
+  code: string
+  capacityScore: number
+  currentSLA: string
+  maxReviewersPerVideo: number
+  checkoutEnabled: boolean
+  liveAddOnEnabled: boolean
+  activeReviewers: number
+  pendingTasks: number
+  avgDeliveryTime: string
+}
+
+export interface CapacityResponse {
+  languagePools: LanguagePoolCapacity[]
+}

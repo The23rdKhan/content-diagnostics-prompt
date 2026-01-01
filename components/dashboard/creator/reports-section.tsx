@@ -1,71 +1,82 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
-import { BarChart3, Download, Eye, TrendingUp, TrendingDown, Minus } from "lucide-react"
-
-const mockReports = [
-  {
-    id: "1",
-    title: "Product Demo v2.mp4",
-    date: "2025-12-29",
-    clarityScore: 78,
-    pacingScore: 85,
-    engagementScore: 72,
-    trend: "up",
-  },
-  {
-    id: "2",
-    title: "Tutorial Episode 4.mov",
-    date: "2025-12-25",
-    clarityScore: 82,
-    pacingScore: 79,
-    engagementScore: 88,
-    trend: "up",
-  },
-  {
-    id: "3",
-    title: "Onboarding Video.mp4",
-    date: "2025-12-20",
-    clarityScore: 65,
-    pacingScore: 70,
-    engagementScore: 68,
-    trend: "down",
-  },
-]
+import { Skeleton } from "@/components/ui/skeleton"
+import { BarChart3, Download, Eye, TrendingUp, TrendingDown, Minus, AlertCircle } from "lucide-react"
+import { useCreatorReports } from "@/lib/hooks/use-creator"
+import type { ReportDto } from "@/lib/types/api"
 
 export function ReportsSection() {
-  const [selectedReport, setSelectedReport] = useState<string | null>(null)
+  const [selectedReportId, setSelectedReportId] = useState<number | null>(null)
+  const { reports, loading, error, refetch } = useCreatorReports()
 
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case "up":
-        return <TrendingUp className="h-4 w-4 text-green-500" />
-      case "down":
-        return <TrendingDown className="h-4 w-4 text-red-500" />
-      default:
-        return <Minus className="h-4 w-4 text-muted-foreground" />
+  // Calculate average scores
+  const avgScores = useMemo(() => {
+    if (!reports.length) return { clarity: 0, pacing: 0, engagement: 0 }
+    const completed = reports.filter((r) => r.clarityScore !== undefined)
+    if (!completed.length) return { clarity: 0, pacing: 0, engagement: 0 }
+    return {
+      clarity: Math.round(completed.reduce((sum, r) => sum + (r.clarityScore || 0), 0) / completed.length),
+      pacing: Math.round(completed.reduce((sum, r) => sum + (r.pacingScore || 0), 0) / completed.length),
+      engagement: Math.round(completed.reduce((sum, r) => sum + (r.engagementScore || 0), 0) / completed.length),
     }
+  }, [reports])
+
+  const getTrendIcon = (report: ReportDto) => {
+    // Determine trend based on engagement score vs average
+    const avgEngagement = avgScores.engagement
+    const score = report.engagementScore || 0
+    if (score > avgEngagement + 5) return <TrendingUp className="h-4 w-4 text-green-500" />
+    if (score < avgEngagement - 5) return <TrendingDown className="h-4 w-4 text-red-500" />
+    return <Minus className="h-4 w-4 text-muted-foreground" />
   }
 
-  const report = selectedReport ? mockReports.find((r) => r.id === selectedReport) : null
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-center">
+        <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
+        <p className="mt-2 text-destructive">Failed to load reports</p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+          Try Again
+        </Button>
+      </div>
+    )
+  }
+
+  const selectedReport = selectedReportId ? reports.find((r) => r.id === selectedReportId) : null
 
   return (
     <div className="space-y-6">
-      {!selectedReport ? (
+      {!selectedReportId ? (
         <>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-xl border border-border bg-card p-4">
               <p className="text-sm text-muted-foreground">Avg. Clarity Score</p>
-              <p className="mt-1 text-2xl font-bold text-card-foreground">75</p>
+              <p className="mt-1 text-2xl font-bold text-card-foreground">{avgScores.clarity}</p>
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
               <p className="text-sm text-muted-foreground">Avg. Pacing Score</p>
-              <p className="mt-1 text-2xl font-bold text-card-foreground">78</p>
+              <p className="mt-1 text-2xl font-bold text-card-foreground">{avgScores.pacing}</p>
             </div>
             <div className="rounded-xl border border-border bg-card p-4">
               <p className="text-sm text-muted-foreground">Avg. Engagement</p>
-              <p className="mt-1 text-2xl font-bold text-card-foreground">76</p>
+              <p className="mt-1 text-2xl font-bold text-card-foreground">{avgScores.engagement}</p>
             </div>
           </div>
 
@@ -73,44 +84,54 @@ export function ReportsSection() {
             <div className="border-b border-border p-4">
               <h2 className="text-lg font-semibold text-card-foreground">Completed Reports</h2>
             </div>
-            <div className="divide-y divide-border">
-              {mockReports.map((report) => (
-                <div key={report.id} className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
-                      <BarChart3 className="h-4 w-4 text-secondary-foreground" />
+            {reports.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                No reports yet. Upload a video to get started.
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {reports.map((report) => (
+                  <div key={report.id} className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary">
+                        <BarChart3 className="h-4 w-4 text-secondary-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{report.videoTitle}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Completed {report.dateCompleted ? new Date(report.dateCompleted).toLocaleDateString() : "Pending"}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{report.title}</p>
-                      <p className="text-sm text-muted-foreground">Completed {report.date}</p>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        {getTrendIcon(report)}
+                        <span className="text-sm text-foreground">{report.clarityScore || 0}/100</span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={() => setSelectedReportId(report.id)}>
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      {getTrendIcon(report.trend)}
-                      <span className="text-sm text-foreground">{report.clarityScore}/100</span>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => setSelectedReport(report.id)}>
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       ) : (
         <div className="space-y-6">
-          <Button variant="ghost" onClick={() => setSelectedReport(null)}>
+          <Button variant="ghost" onClick={() => setSelectedReportId(null)}>
             ← Back to Reports
           </Button>
 
           <div className="rounded-xl border border-border bg-card p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-xl font-semibold text-card-foreground">{report?.title}</h2>
-                <p className="text-sm text-muted-foreground">Report generated {report?.date}</p>
+                <h2 className="text-xl font-semibold text-card-foreground">{selectedReport?.videoTitle}</h2>
+                <p className="text-sm text-muted-foreground">
+                  Report generated {selectedReport?.dateCompleted ? new Date(selectedReport.dateCompleted).toLocaleDateString() : "Pending"}
+                </p>
               </div>
               <Button variant="outline">
                 <Download className="h-4 w-4 mr-2" />
@@ -122,32 +143,31 @@ export function ReportsSection() {
               <div className="rounded-lg bg-secondary p-4">
                 <h3 className="font-semibold text-secondary-foreground">Executive Summary</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  This video performed well in terms of pacing but could benefit from improved clarity in the
-                  introduction section. Reviewers noted strong engagement in the middle portion but attention drop-off
-                  in the final 30 seconds.
+                  {selectedReport?.executiveSummary ||
+                    "This video performed well in terms of pacing but could benefit from improved clarity in the introduction section. Reviewers noted strong engagement in the middle portion but attention drop-off in the final 30 seconds."}
                 </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-lg border border-border p-4">
                   <p className="text-sm text-muted-foreground">Clarity Score</p>
-                  <p className="mt-1 text-3xl font-bold text-foreground">{report?.clarityScore}</p>
+                  <p className="mt-1 text-3xl font-bold text-foreground">{selectedReport?.clarityScore || 0}</p>
                   <div className="mt-2 h-2 w-full rounded-full bg-muted">
-                    <div className="h-2 rounded-full bg-accent" style={{ width: `${report?.clarityScore}%` }} />
+                    <div className="h-2 rounded-full bg-accent" style={{ width: `${selectedReport?.clarityScore || 0}%` }} />
                   </div>
                 </div>
                 <div className="rounded-lg border border-border p-4">
                   <p className="text-sm text-muted-foreground">Pacing Score</p>
-                  <p className="mt-1 text-3xl font-bold text-foreground">{report?.pacingScore}</p>
+                  <p className="mt-1 text-3xl font-bold text-foreground">{selectedReport?.pacingScore || 0}</p>
                   <div className="mt-2 h-2 w-full rounded-full bg-muted">
-                    <div className="h-2 rounded-full bg-green-500" style={{ width: `${report?.pacingScore}%` }} />
+                    <div className="h-2 rounded-full bg-green-500" style={{ width: `${selectedReport?.pacingScore || 0}%` }} />
                   </div>
                 </div>
                 <div className="rounded-lg border border-border p-4">
                   <p className="text-sm text-muted-foreground">Engagement Score</p>
-                  <p className="mt-1 text-3xl font-bold text-foreground">{report?.engagementScore}</p>
+                  <p className="mt-1 text-3xl font-bold text-foreground">{selectedReport?.engagementScore || 0}</p>
                   <div className="mt-2 h-2 w-full rounded-full bg-muted">
-                    <div className="h-2 rounded-full bg-chart-4" style={{ width: `${report?.engagementScore}%` }} />
+                    <div className="h-2 rounded-full bg-chart-4" style={{ width: `${selectedReport?.engagementScore || 0}%` }} />
                   </div>
                 </div>
               </div>
@@ -155,34 +175,36 @@ export function ReportsSection() {
               <div className="rounded-lg bg-secondary p-4">
                 <h3 className="font-semibold text-secondary-foreground">Timeline Feedback</h3>
                 <div className="mt-4 space-y-3">
-                  <div className="flex gap-4">
-                    <span className="text-sm font-mono text-accent">0:00-0:30</span>
-                    <p className="text-sm text-muted-foreground">
-                      Opening could be clearer - 40% of reviewers reported confusion
-                    </p>
-                  </div>
-                  <div className="flex gap-4">
-                    <span className="text-sm font-mono text-accent">0:30-2:00</span>
-                    <p className="text-sm text-muted-foreground">
-                      Strong engagement - clear explanations and good pacing
-                    </p>
-                  </div>
-                  <div className="flex gap-4">
-                    <span className="text-sm font-mono text-accent">2:00-2:45</span>
-                    <p className="text-sm text-muted-foreground">
-                      Attention drop-off detected - consider adding visual aid
-                    </p>
-                  </div>
+                  {selectedReport?.timelineInsights?.length ? (
+                    selectedReport.timelineInsights.map((insight, i) => (
+                      <div key={i} className="flex gap-4">
+                        <span className="text-sm font-mono text-accent">{insight.timestamp}</span>
+                        <p className="text-sm text-muted-foreground">{insight.observation}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <div className="flex gap-4">
+                        <span className="text-sm font-mono text-accent">0:00-0:30</span>
+                        <p className="text-sm text-muted-foreground">Opening analysis pending...</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
               <div className="rounded-lg bg-secondary p-4">
                 <h3 className="font-semibold text-secondary-foreground">Actionable Recommendations</h3>
                 <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
-                  <li>• Simplify the introduction with a clearer hook statement</li>
-                  <li>• Add supporting visuals at the 2:15 timestamp</li>
-                  <li>• Strengthen the call-to-action in the closing segment</li>
-                  <li>• Consider reducing technical jargon in the first 30 seconds</li>
+                  {selectedReport?.actionPlan?.length ? (
+                    selectedReport.actionPlan.map((item, i) => (
+                      <li key={i}>• {item.action}</li>
+                    ))
+                  ) : (
+                    <>
+                      <li>• Analysis in progress...</li>
+                    </>
+                  )}
                 </ul>
               </div>
 

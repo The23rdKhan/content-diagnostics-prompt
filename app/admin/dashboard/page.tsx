@@ -5,14 +5,17 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Users, FileText, Clock, AlertTriangle, TrendingUp, CheckCircle2, XCircle, DollarSign } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Users, FileText, Clock, AlertTriangle, TrendingUp, CheckCircle2, XCircle, DollarSign, AlertCircle } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { useState } from "react"
+import { useAdminKpis } from "@/lib/hooks/use-admin"
 
 export default function AdminDashboard() {
   const [checkoutEnabled, setCheckoutEnabled] = useState(true)
   const [liveAddOnEnabled, setLiveAddOnEnabled] = useState(true)
   const [surgePayMultiplier, setSurgePayMultiplier] = useState(1.0)
+  const { kpis, loading, error, refetch } = useAdminKpis()
 
   const handleCheckoutToggle = (enabled: boolean) => {
     setCheckoutEnabled(enabled)
@@ -34,6 +37,24 @@ export default function AdminDashboard() {
     trackEvent("admin_sla_extended", { from: "24h", to: "48h" })
   }
 
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <p>Failed to load dashboard data. Please try again.</p>
+            </div>
+            <Button variant="outline" className="mt-4" onClick={refetch}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="p-8 space-y-8">
       <div>
@@ -49,22 +70,30 @@ export default function AdminDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">23</div>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">{kpis?.totalCreators ?? 0}</div>
+            )}
             <p className="text-xs text-muted-foreground mt-1">
-              <span className="text-accent font-medium">+12</span> today, 157 in 7d
+              <span className="text-accent font-medium">Total</span> registered creators
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Subscriptions</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Reviewers</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">342</div>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">{kpis?.totalReviewers ?? 0}</div>
+            )}
             <p className="text-xs text-muted-foreground mt-1">
-              <span className="text-accent font-medium">+8%</span> vs last month
+              <span className="text-accent font-medium">{kpis?.activeReviewers ?? 0}</span> currently active
             </p>
           </CardContent>
         </Card>
@@ -75,8 +104,12 @@ export default function AdminDashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">87</div>
-            <p className="text-xs text-muted-foreground mt-1">723 segments to review</p>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">{kpis?.uploadsToday ?? 0}</div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">{kpis?.segmentsToReview ?? 0} segments to review</p>
           </CardContent>
         </Card>
 
@@ -86,8 +119,12 @@ export default function AdminDashboard() {
             <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">134</div>
-            <p className="text-xs text-muted-foreground mt-1">Avg 21.3h delivery</p>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">{kpis?.reportsDelivered ?? 0}</div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">Avg {kpis?.avgDeliveryTimeHours?.toFixed(1) ?? "0"}h delivery</p>
           </CardContent>
         </Card>
 
@@ -97,9 +134,13 @@ export default function AdminDashboard() {
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">21.3h</div>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">{kpis?.avgDeliveryTimeHours?.toFixed(1) ?? "0"}h</div>
+            )}
             <p className="text-xs text-muted-foreground mt-1">
-              <span className="text-red-500 font-medium">+2.1h</span> vs target
+              Average time to deliver reports
             </p>
           </CardContent>
         </Card>
@@ -110,8 +151,12 @@ export default function AdminDashboard() {
             <XCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">7</div>
-            <p className="text-xs text-muted-foreground mt-1">5.2% of deliveries</p>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">{kpis?.slaMissCount ?? 0}</div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">{kpis?.slaMissRate?.toFixed(1) ?? "0"}% of deliveries</p>
           </CardContent>
         </Card>
 
@@ -121,8 +166,12 @@ export default function AdminDashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">286</div>
-            <p className="text-xs text-muted-foreground mt-1">721 tasks completed today</p>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">{kpis?.activeReviewers ?? 0}</div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">{kpis?.tasksCompletedToday ?? 0} tasks completed today</p>
           </CardContent>
         </Card>
 
@@ -132,8 +181,12 @@ export default function AdminDashboard() {
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">8.4%</div>
-            <p className="text-xs text-muted-foreground mt-1">61 rejected submissions</p>
+            {loading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">{kpis?.reviewFailureRate?.toFixed(1) ?? "0"}%</div>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">{kpis?.rejectedSubmissions ?? 0} rejected submissions</p>
           </CardContent>
         </Card>
       </div>

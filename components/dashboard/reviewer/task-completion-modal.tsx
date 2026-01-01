@@ -3,13 +3,20 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { X, Play, AlertCircle } from "lucide-react"
-import type { ReviewTask } from "@/lib/task-data"
+import type { TaskDto } from "@/lib/types/api"
 import Image from "next/image"
 
+// Helper to format segment duration as mm:ss
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, "0")}`
+}
+
 interface TaskCompletionModalProps {
-  task: ReviewTask
+  task: TaskDto
   onClose: () => void
-  onSubmit: (taskId: string, answers: Record<string, any>, watchTime: number) => void
+  onSubmit: (taskId: string, answers: Record<string, string>, watchTime: number) => void
 }
 
 export function TaskCompletionModal({ task, onClose, onSubmit }: TaskCompletionModalProps) {
@@ -29,23 +36,23 @@ export function TaskCompletionModal({ task, onClose, onSubmit }: TaskCompletionM
   }, [videoStarted])
 
   useEffect(() => {
-    const minWatchTime = task.videoSegmentDuration * 0.7
+    const minWatchTime = task.segmentDurationSeconds * 0.7
     if (watchTime >= minWatchTime) {
       setCanSubmit(true)
     }
-  }, [watchTime, task.videoSegmentDuration])
+  }, [watchTime, task.segmentDurationSeconds])
 
-  const handleAnswer = (questionId: string, answer: any) => {
+  const handleAnswer = (questionId: string, answer: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: answer }))
   }
 
   const handleSubmit = () => {
-    onSubmit(task.id, answers, watchTime)
+    onSubmit(String(task.id), answers, watchTime)
   }
 
   const allRequiredAnswered = task.questions.filter((q) => q.type !== "text").every((q) => answers[q.id] !== undefined)
 
-  const minWatchTime = task.videoSegmentDuration * 0.7
+  const minWatchTime = task.segmentDurationSeconds * 0.7
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm overflow-auto p-4">
@@ -66,9 +73,9 @@ export function TaskCompletionModal({ task, onClose, onSubmit }: TaskCompletionM
           {/* Video Player */}
           <div>
             <div className="aspect-video rounded-lg bg-secondary flex items-center justify-center overflow-hidden relative">
-              {task.videoUrl ? (
+              {task.videoSegmentUrl ? (
                 <>
-                  <Image src={task.videoUrl || "/placeholder.svg"} alt="Video segment" fill className="object-cover" />
+                  <Image src={task.videoSegmentUrl || "/placeholder.svg"} alt="Video segment" fill className="object-cover" />
                   {!videoStarted && (
                     <button
                       onClick={() => setVideoStarted(true)}
@@ -85,7 +92,7 @@ export function TaskCompletionModal({ task, onClose, onSubmit }: TaskCompletionM
                   {videoStarted && (
                     <div className="absolute bottom-4 right-4 rounded-lg bg-black/70 px-3 py-1.5 text-sm text-white font-medium">
                       {Math.floor(watchTime / 60)}:{(watchTime % 60).toString().padStart(2, "0")} /{" "}
-                      {task.videoSegmentLength}
+                      {formatDuration(task.segmentDurationSeconds)}
                     </div>
                   )}
                 </>
@@ -93,7 +100,7 @@ export function TaskCompletionModal({ task, onClose, onSubmit }: TaskCompletionM
                 <div className="text-center">
                   <Play className="mx-auto h-12 w-12 text-muted-foreground" />
                   <p className="mt-2 text-muted-foreground">Video Player</p>
-                  <p className="text-sm text-muted-foreground">Length: {task.videoSegmentLength}</p>
+                  <p className="text-sm text-muted-foreground">Length: {formatDuration(task.segmentDurationSeconds)}</p>
                 </div>
               )}
             </div>

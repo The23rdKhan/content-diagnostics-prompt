@@ -1,17 +1,47 @@
 "use client"
 
 import { useState } from "react"
-import { Clock, CheckCircle, AlertCircle, Play, TrendingUp, ChevronRight, Zap, AlertTriangle } from "lucide-react"
-import { mockJobs, getJobStatusLabel, getJobStatusHelperText, type Job, type JobStatus } from "@/lib/job-data"
+import { Clock, CheckCircle, AlertCircle, Play, TrendingUp, ChevronRight, Zap, AlertTriangle, Loader2 } from "lucide-react"
+import { useCreatorJobs, getJobStatusLabel, getJobStatusHelperText } from "@/lib/hooks/use-creator"
+import type { JobDto, JobStatus } from "@/lib/types/api"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { trackEvent } from "@/lib/analytics"
 
 export function ReviewStatusSection() {
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
+  const { jobs, loading, error, refetch } = useCreatorJobs()
 
-  const totalJobs = mockJobs.length
-  const inReviewCount = mockJobs.filter((j) => ["IN_REVIEW", "PROCESSING", "SEGMENTED"].includes(j.status)).length
-  const completedCount = mockJobs.filter((j) => j.status === "DELIVERED").length
+  // Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-96 rounded-xl" />
+      </div>
+    )
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-center">
+        <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
+        <p className="mt-2 text-destructive">Failed to load jobs</p>
+        <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+          Try Again
+        </Button>
+      </div>
+    )
+  }
+
+  const totalJobs = jobs.length
+  const inReviewCount = jobs.filter((j) => ["IN_REVIEW", "PROCESSING", "SEGMENTED"].includes(j.status)).length
+  const completedCount = jobs.filter((j) => j.status === "DELIVERED").length
 
   const getStatusColor = (status: JobStatus) => {
     if (status === "DELIVERED") return "text-green-500"
@@ -27,7 +57,7 @@ export function ReviewStatusSection() {
     return <AlertCircle className="h-4 w-4" />
   }
 
-  const getSLABadge = (job: Job) => {
+  const getSLABadge = (job: JobDto) => {
     if (job.slaStatus === "at-risk") {
       return (
         <span className="inline-flex items-center gap-1 rounded bg-yellow-500/10 px-2 py-0.5 text-xs text-yellow-600 dark:text-yellow-400">
@@ -58,20 +88,20 @@ export function ReviewStatusSection() {
     return ["PROCESSING", "SEGMENTED", "IN_REVIEW"].includes(status)
   }
 
-  const handleUpgradeClick = (job: Job) => {
+  const handleUpgradeClick = (job: JobDto) => {
     if (canUpgradeDelivery(job.status)) {
       trackEvent("creator_addon_upgrade_clicked", { jobId: job.id, currentStatus: job.status })
       alert("Upgrade to faster delivery - feature coming soon")
     }
   }
 
-  const handleViewReport = (jobId: string) => {
+  const handleViewReport = (jobId: number) => {
     trackEvent("creator_status_viewed", { jobId })
     // In production, navigate to /creators/reports/${jobId}
     alert(`Viewing report for job ${jobId}`)
   }
 
-  const selectedJob = selectedJobId ? mockJobs.find((j) => j.id === selectedJobId) : null
+  const selectedJob = selectedJobId ? jobs.find((j) => j.id === selectedJobId) : null
 
   return (
     <div className="space-y-6">
@@ -97,7 +127,7 @@ export function ReviewStatusSection() {
           <h2 className="text-lg font-semibold text-card-foreground">Recent Submissions</h2>
         </div>
         <div className="divide-y divide-border">
-          {mockJobs.map((job) => (
+          {jobs.map((job) => (
             <div key={job.id} className="p-4 hover:bg-secondary/50 transition-colors">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-4 flex-1">
@@ -106,14 +136,14 @@ export function ReviewStatusSection() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-foreground">{job.title}</p>
+                      <p className="font-medium text-foreground">{job.videoTitle}</p>
                       {getSLABadge(job)}
                       <span className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
                         {job.language}
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Uploaded {new Date(job.uploadedAt).toLocaleDateString()}
+                      Uploaded {new Date(job.createdAt).toLocaleDateString()}
                       {job.deliveredAt && ` • Delivered in ${job.deliveryTimeHours}h`}
                     </p>
 

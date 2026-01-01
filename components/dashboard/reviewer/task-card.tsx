@@ -5,13 +5,20 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Play, Clock, Globe, DollarSign, Timer } from "lucide-react"
-import type { ReviewTask } from "@/lib/task-data"
+import type { TaskDto } from "@/lib/types/api"
+
+// Helper to format segment duration as mm:ss
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, "0")}`
+}
 
 interface TaskCardProps {
-  task: ReviewTask
-  onAccept: (task: ReviewTask) => void
-  onResume: (task: ReviewTask) => void
-  onStart: (task: ReviewTask) => void
+  task: TaskDto
+  onAccept: (task: TaskDto) => void
+  onResume: (task: TaskDto) => void
+  onStart: (task: TaskDto) => void
   getStatusBadge: (status: string) => React.ReactNode
   isLocked: boolean
 }
@@ -21,8 +28,9 @@ export function TaskCard({ task, onAccept, onResume, onStart, getStatusBadge, is
 
   useEffect(() => {
     if (task.leaseExpiresAt) {
+      const expiresAt = new Date(task.leaseExpiresAt).getTime()
       const interval = setInterval(() => {
-        const remaining = Math.max(0, Math.floor((task.leaseExpiresAt! - Date.now()) / 1000))
+        const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000))
         setTimeRemaining(remaining)
       }, 1000)
 
@@ -55,7 +63,7 @@ export function TaskCard({ task, onAccept, onResume, onStart, getStatusBadge, is
           <div className="grid gap-2 md:grid-cols-5 md:gap-6 flex-1">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-foreground">{task.videoSegmentLength}</span>
+              <span className="text-sm text-foreground">{formatDuration(task.segmentDurationSeconds)}</span>
             </div>
             <div className="flex items-center gap-2">
               <Globe className="h-4 w-4 text-muted-foreground" />
