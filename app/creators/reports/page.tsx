@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty"
 import {
   ArrowLeft,
   Filter,
@@ -470,12 +471,18 @@ export default function ReportsListPage() {
         {/* Reports List */}
         <div className="space-y-4">
           {filteredReports.length === 0 ? (
-            <div className="rounded-xl border border-border bg-card p-12 text-center">
-              <FileText className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold text-foreground">No reports found</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Try adjusting your filters or submit a new video for review.
-              </p>
+            <div className="rounded-xl border border-border bg-card p-6">
+              <Empty>
+                <EmptyMedia variant="icon">
+                  <FileText className="h-5 w-5" />
+                </EmptyMedia>
+                <EmptyHeader>
+                  <EmptyTitle>No reports found</EmptyTitle>
+                  <EmptyDescription>
+                    Try adjusting your filters or submit a new video for review.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             </div>
           ) : (
             filteredReports.map((report) => (
