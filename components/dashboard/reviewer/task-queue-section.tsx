@@ -3,9 +3,9 @@
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AlertCircle, XCircle, Filter, RefreshCw } from "lucide-react"
-import { useReviewerTasks, useReviewerProfile } from "@/lib/hooks/use-reviewer"
-import type { TaskDto, TaskStatus, ReviewerProfile } from "@/lib/types/api"
+import { AlertCircle, XCircle, Filter, RefreshCw, AlertTriangle } from "lucide-react"
+import { useReviewerTasks, useReviewerProfile, useTaskActions, useReviewerEarnings } from "@/lib/hooks/use-reviewer"
+import type { TaskDto, TaskStatus } from "@/lib/types/api"
 import { trackEvent } from "@/lib/analytics"
 import { TaskCompletionModal } from "./task-completion-modal"
 import { TaskCard } from "./task-card"
@@ -19,16 +19,20 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, "0")}`
 }
 
-// Helper to estimate review time based on video duration
-function estimateTime(durationSeconds: number): string {
-  const minutes = Math.ceil((durationSeconds * 1.5) / 60) // ~1.5x video length
-  return `~${minutes} min`
-}
-
 export function TaskQueueSection() {
   // Fetch tasks and profile from API
   const { tasks: apiTasks, loading: tasksLoading, error: tasksError, refetch: refetchTasks } = useReviewerTasks()
   const { profile, loading: profileLoading, error: profileError } = useReviewerProfile()
+  const { refetch: refetchEarnings } = useReviewerEarnings()
+
+  // Task actions hook
+  const {
+    acceptTask: apiAcceptTask,
+    submitTask: apiSubmitTask,
+    loading: actionLoading,
+    error: actionError,
+    clearError: clearActionError,
+  } = useTaskActions()
 
   // Local state for UI interactions
   const [localTasks, setLocalTasks] = useState<TaskDto[]>([])
@@ -36,19 +40,22 @@ export function TaskQueueSection() {
   const [activeTask, setActiveTask] = useState<TaskDto | null>(null)
   const [showAcceptModal, setShowAcceptModal] = useState<TaskDto | null>(null)
   const [showQualityWarning, setShowQualityWarning] = useState(false)
+  const [showConflictError, setShowConflictError] = useState(false)
+  const [pendingAcceptId, setPendingAcceptId] = useState<number | null>(null)
 
   // Sync API tasks to local state
   useEffect(() => {
-    if (apiTasks.length > 0) {
+    if (apiTasks.length > 0 || !tasksLoading) {
       setLocalTasks(apiTasks)
     }
-  }, [apiTasks])
+  }, [apiTasks, tasksLoading])
 
   // Derive quality profile state
   const qualityProfile = useMemo(() => ({
     score: profile?.qualityScore ?? 100,
     tasksCompleted: profile?.tasksCompleted ?? 0,
     isLocked: profile?.queueLocked ?? false,
+    warnings: [] as string[],
   }), [profile])
 
   const loading = tasksLoading || profileLoading
@@ -65,12 +72,6 @@ export function TaskQueueSection() {
               trackEvent("reviewer_task_lease_expired", { taskId: task.id })
               return { ...task, status: "REQUEUED" as TaskStatus, leaseExpiresAt: undefined }
             }
-          }
-          // Auto-transition REQUEUED back to AVAILABLE after 1 second
-          if (task.status === "REQUEUED") {
-            setTimeout(() => {
-              setLocalTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: "AVAILABLE" as TaskStatus } : t)))
-            }, 1000)
           }
           return task
         }),
@@ -97,29 +98,47 @@ export function TaskQueueSection() {
     }
   }, [qualityProfile.score, showQualityWarning])
 
+  // Handle 409 conflict errors
+  useEffect(() => {
+    if (actionError?.status === 409) {
+      setShowConflictError(true)
+      // Refresh tasks to get updated state
+      refetchTasks()
+    }
+  }, [actionError, refetchTasks])
+
   const handleAcceptTask = (task: TaskDto) => {
     setShowAcceptModal(task)
+    clearActionError()
   }
 
-  const confirmAcceptTask = () => {
+  const confirmAcceptTask = async () => {
     if (!showAcceptModal) return
 
-    const leaseTime = 10 * 60 * 1000 // 10 minutes
-    const updatedTask: TaskDto = {
-      ...showAcceptModal,
-      status: "LEASED" as TaskStatus,
-      leaseExpiresAt: new Date(Date.now() + leaseTime).toISOString(),
+    const taskId = showAcceptModal.id
+    setPendingAcceptId(taskId)
+
+    try {
+      const updatedTask = await apiAcceptTask(taskId)
+
+      // Update local state with backend response
+      setLocalTasks((prevTasks) =>
+        prevTasks.map((t) => (t.id === taskId ? updatedTask : t))
+      )
+
+      trackEvent("reviewer_task_accepted", {
+        taskId,
+        language: showAcceptModal.language,
+        payAmount: showAcceptModal.payAmount,
+      })
+
+      setShowAcceptModal(null)
+    } catch (err) {
+      // Error is already set in useTaskActions hook
+      console.error("Failed to accept task:", err)
+    } finally {
+      setPendingAcceptId(null)
     }
-
-    setLocalTasks((prevTasks) => prevTasks.map((t) => (t.id === showAcceptModal.id ? updatedTask : t)))
-
-    trackEvent("reviewer_task_accepted", {
-      taskId: showAcceptModal.id,
-      language: showAcceptModal.language,
-      payAmount: showAcceptModal.payAmount,
-    })
-
-    setShowAcceptModal(null)
   }
 
   const handleResumeTask = (task: TaskDto) => {
@@ -134,48 +153,51 @@ export function TaskQueueSection() {
     trackEvent("reviewer_task_started", { taskId: task.id })
   }
 
-  const handleTaskSubmit = (taskId: string, answers: Record<string, string>, watchTime: number) => {
+  const handleTaskSubmit = async (taskId: string, answers: Record<string, string>, watchTime: number) => {
     const numericId = parseInt(taskId, 10)
     const task = localTasks.find((t) => t.id === numericId)
     if (!task) return
 
+    // Calculate watch ratio
+    const watchRatio = task.segmentDurationSeconds > 0
+      ? Math.min(watchTime / task.segmentDurationSeconds, 1)
+      : 1
+
     // Check attention check (frontend validation - backend will also validate)
-    const attentionCheckQuestion = task.questions[task.attentionCheckIndex ?? 0]
-    const attentionCheckPassed = !attentionCheckQuestion || answers[attentionCheckQuestion.id] !== undefined
+    const attentionCheckQuestion = task.questions[task.attentionCheckIndex ?? -1]
+    const attentionPassed = !attentionCheckQuestion ||
+      (attentionCheckQuestion.type === "attention-check" && answers[attentionCheckQuestion.id] !== undefined)
 
-    // Check completion time (too fast = suspicious)
-    const minWatchTime = task.segmentDurationSeconds * 0.7 // Must watch at least 70% of video duration
-    const completedTooFast = watchTime < minWatchTime
-
-    // Update local state optimistically
-    const newStatus: TaskStatus = !attentionCheckPassed || completedTooFast ? "REJECTED" : "QC_PENDING"
-
-    if (!attentionCheckPassed || completedTooFast) {
-      trackEvent("reviewer_task_qc_rejected", {
-        taskId,
-        reason: !attentionCheckPassed ? "attention_check_failed" : "completed_too_fast",
-        watchTime,
+    try {
+      // Submit to backend with full payload
+      const updatedTask = await apiSubmitTask(numericId, {
+        answers,
+        watchRatio,
+        attentionPassed,
       })
-    } else {
-      trackEvent("reviewer_task_submitted", { taskId, watchTime, attentionCheckPassed })
+
+      // Update local state with backend response
+      setLocalTasks((prevTasks) =>
+        prevTasks.map((t) => (t.id === numericId ? updatedTask : t))
+      )
+
+      trackEvent("reviewer_task_submitted", {
+        taskId,
+        watchRatio,
+        attentionPassed,
+        status: updatedTask.status,
+      })
+
+      setActiveTask(null)
+
+      // Refresh tasks and earnings
+      await Promise.all([refetchTasks(), refetchEarnings()])
+    } catch (err) {
+      console.error("Failed to submit task:", err)
+      // Don't optimistically update on error - just close modal and refresh
+      setActiveTask(null)
+      refetchTasks()
     }
-
-    setLocalTasks((prevTasks) =>
-      prevTasks.map((t) =>
-        t.id === numericId
-          ? {
-              ...t,
-              status: newStatus,
-              submittedAt: new Date().toISOString(),
-              reviewedAt: newStatus === "REJECTED" ? new Date().toISOString() : undefined,
-            }
-          : t,
-      ),
-    )
-
-    setActiveTask(null)
-    // Refetch to get actual backend status
-    setTimeout(() => refetchTasks(), 1000)
   }
 
   const filteredTasks = localTasks.filter((task) => {
@@ -242,13 +264,6 @@ export function TaskQueueSection() {
     const reviewedAt = new Date(t.reviewedAt).getTime()
     return Date.now() - reviewedAt < 86400000
   }).length
-  const earnedToday = localTasks
-    .filter((t) => {
-      if (t.status !== "APPROVED" || !t.reviewedAt) return false
-      const reviewedAt = new Date(t.reviewedAt).getTime()
-      return Date.now() - reviewedAt < 86400000
-    })
-    .reduce((sum, t) => sum + t.payAmount, 0)
 
   if (activeTask) {
     return <TaskCompletionModal task={activeTask} onClose={() => setActiveTask(null)} onSubmit={handleTaskSubmit} />
@@ -273,6 +288,29 @@ export function TaskQueueSection() {
 
   return (
     <div className="space-y-6">
+      {/* Conflict Error Banner */}
+      {showConflictError && (
+        <div className="rounded-xl border border-yellow-500 bg-yellow-500/5 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-yellow-600 dark:text-yellow-500">Task Already Taken</h3>
+              <p className="mt-1 text-sm text-yellow-600/80 dark:text-yellow-500/80">
+                This task was accepted by another reviewer. The task list has been refreshed.
+              </p>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="mt-3 text-yellow-600 dark:text-yellow-500"
+                onClick={() => setShowConflictError(false)}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quality Warning */}
       {showQualityWarning && qualityProfile.score < 70 && (
         <div className="rounded-xl border border-red-500 bg-red-500/5 p-4">
@@ -286,13 +324,6 @@ export function TaskQueueSection() {
                   ? " Your task queue is locked. Please contact support to re-qualify."
                   : " Maintain high quality to avoid queue restrictions."}
               </p>
-              {qualityProfile.warnings.length > 0 && (
-                <ul className="mt-2 space-y-1 text-sm text-red-600/80 dark:text-red-500/80">
-                  {qualityProfile.warnings.slice(-3).map((warning, i) => (
-                    <li key={i}>• {warning}</li>
-                  ))}
-                </ul>
-              )}
               <Button
                 size="sm"
                 variant="ghost"
@@ -459,12 +490,39 @@ export function TaskQueueSection() {
                 <span className="font-semibold text-accent">${showAcceptModal.payAmount.toFixed(2)}</span>
               </div>
             </div>
+
+            {/* Show error if accept failed */}
+            {actionError && (
+              <div className="mt-4 rounded-lg bg-destructive/10 border border-destructive/30 p-3">
+                <p className="text-sm text-destructive">{actionError.message}</p>
+              </div>
+            )}
+
             <div className="mt-6 flex gap-3">
-              <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setShowAcceptModal(null)}>
+              <Button
+                variant="outline"
+                className="flex-1 bg-transparent"
+                onClick={() => {
+                  setShowAcceptModal(null)
+                  clearActionError()
+                }}
+                disabled={actionLoading}
+              >
                 Cancel
               </Button>
-              <Button className="flex-1" onClick={confirmAcceptTask}>
-                Accept Task
+              <Button
+                className="flex-1"
+                onClick={confirmAcceptTask}
+                disabled={actionLoading || pendingAcceptId === showAcceptModal.id}
+              >
+                {actionLoading ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Accepting...
+                  </>
+                ) : (
+                  "Accept Task"
+                )}
               </Button>
             </div>
           </div>

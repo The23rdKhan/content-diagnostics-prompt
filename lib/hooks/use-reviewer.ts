@@ -1,17 +1,21 @@
 "use client"
 
-import { useApi, useApiMutation } from "./use-api"
-import type { TaskDto, EarningsResponse, ReviewerProfile } from "@/lib/types/api"
+import { useState, useCallback } from "react"
+import { useApi } from "./use-api"
+import { api } from "@/lib/api"
+import type { TaskDto, TaskStatus, EarningsResponse, ReviewerProfile } from "@/lib/types/api"
+
+// =============================================================================
+// Task Fetching Hooks
+// =============================================================================
 
 /**
  * Hook to fetch reviewer's tasks.
- *
- * @param status - Filter by task status (default: "AVAILABLE")
+ * @param status - Optional filter by task status
  */
-export function useReviewerTasks(status: string = "AVAILABLE") {
-  const { data, loading, error, refetch } = useApi<TaskDto[]>(
-    `/reviewer/tasks?status=${status}`
-  )
+export function useReviewerTasks(status?: TaskStatus) {
+  const path = status ? `/reviewer/tasks?status=${status}` : "/reviewer/tasks"
+  const { data, loading, error, refetch } = useApi<TaskDto[]>(path)
 
   return {
     tasks: data ?? [],
@@ -22,39 +26,7 @@ export function useReviewerTasks(status: string = "AVAILABLE") {
 }
 
 /**
- * Hook to fetch reviewer's earnings.
- */
-export function useReviewerEarnings() {
-  const { data, loading, error, refetch } = useApi<EarningsResponse>(
-    "/reviewer/earnings"
-  )
-
-  return {
-    earnings: data,
-    loading,
-    error,
-    refetch,
-  }
-}
-
-/**
- * Hook to fetch reviewer's profile.
- */
-export function useReviewerProfile() {
-  const { data, loading, error, refetch } = useApi<ReviewerProfile>(
-    "/reviewer/profile"
-  )
-
-  return {
-    profile: data,
-    loading,
-    error,
-    refetch,
-  }
-}
-
-/**
- * Hook to fetch reviewer's task history.
+ * Hook to fetch reviewer's task history with pagination.
  */
 export function useReviewerTaskHistory(page: number = 0, size: number = 20) {
   interface TaskHistoryResponse {
@@ -83,17 +55,138 @@ export function useReviewerTaskHistory(page: number = 0, size: number = 20) {
   }
 }
 
+// =============================================================================
+// Earnings Hook
+// =============================================================================
+
 /**
- * Hook for task mutations (accept, submit).
+ * Hook to fetch reviewer's earnings.
  */
-export function useTaskMutation() {
-  const { mutate, loading, error } = useApiMutation<TaskDto>()
+export function useReviewerEarnings() {
+  const { data, loading, error, refetch } = useApi<EarningsResponse>(
+    "/reviewer/earnings"
+  )
 
   return {
-    acceptTask: (taskId: number) => mutate(`/reviewer/tasks/${taskId}/accept`),
-    submitTask: (taskId: number, answers: Record<string, string>) =>
-      mutate(`/reviewer/tasks/${taskId}/submit`, { answers }),
+    earnings: data,
     loading,
     error,
+    refetch,
+  }
+}
+
+// =============================================================================
+// Profile Hook
+// =============================================================================
+
+/**
+ * Hook to fetch reviewer's profile.
+ */
+export function useReviewerProfile() {
+  const { data, loading, error, refetch } = useApi<ReviewerProfile>(
+    "/reviewer/profile"
+  )
+
+  return {
+    profile: data,
+    loading,
+    error,
+    refetch,
+  }
+}
+
+// =============================================================================
+// Task Action Hooks
+// =============================================================================
+
+export interface TaskSubmitPayload {
+  answers: Record<string, string>
+  watchRatio: number
+  attentionPassed: boolean
+}
+
+export interface TaskActionError {
+  status: number
+  message: string
+}
+
+/**
+ * Hook for task mutations (accept, submit, release).
+ */
+export function useTaskActions() {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<TaskActionError | null>(null)
+
+  const clearError = useCallback(() => setError(null), [])
+
+  const acceptTask = useCallback(async (taskId: number): Promise<TaskDto> => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await api.post<TaskDto>(`/reviewer/tasks/${taskId}/accept`)
+      return result
+    } catch (err: unknown) {
+      const apiError = err as { status?: number; message?: string }
+      const status = apiError.status ?? 500
+      const message = status === 409
+        ? "This task has already been accepted by another reviewer."
+        : apiError.message ?? "Failed to accept task"
+
+      setError({ status, message })
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const submitTask = useCallback(async (
+    taskId: number,
+    payload: TaskSubmitPayload
+  ): Promise<TaskDto> => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await api.post<TaskDto>(`/reviewer/tasks/${taskId}/submit`, payload)
+      return result
+    } catch (err: unknown) {
+      const apiError = err as { status?: number; message?: string }
+      setError({
+        status: apiError.status ?? 500,
+        message: apiError.message ?? "Failed to submit task",
+      })
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const releaseTask = useCallback(async (taskId: number): Promise<TaskDto> => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const result = await api.post<TaskDto>(`/reviewer/tasks/${taskId}/release`)
+      return result
+    } catch (err: unknown) {
+      const apiError = err as { status?: number; message?: string }
+      setError({
+        status: apiError.status ?? 500,
+        message: apiError.message ?? "Failed to release task",
+      })
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  return {
+    acceptTask,
+    submitTask,
+    releaseTask,
+    loading,
+    error,
+    clearError,
   }
 }
