@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,30 +15,81 @@ import {
   GitCompare,
   X,
   ChevronDown,
+  Loader2,
 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { trackEvent } from "@/lib/analytics"
-import {
-  mockReports,
-  languagePoolLabels,
-  statusLabels,
-  type Report,
-  type ReportStatus,
-  type LanguagePool,
-  type VideoLength,
-} from "@/lib/reports-data"
+import { useCreatorReports } from "@/lib/hooks/use-creator"
+import type { ReportDto, ReportStatus as ApiReportStatus } from "@/lib/types/api"
 
+// UI-specific types
+type UIReportStatus = "delivered" | "in_progress" | "awaiting_human" | "compiling"
+type LanguagePool = "english_global" | "spanish_latam" | "portuguese_brazil" | "french_europe" | "german" | "japanese" | "korean" | "hindi"
+type VideoLength = "short" | "medium" | "long"
 type SortOption = "newest" | "oldest" | "fastest" | "highest_severity"
 
+// Label mappings
+const languagePoolLabels: Record<string, string> = {
+  english_global: "English (Global)",
+  spanish_latam: "Spanish (LATAM)",
+  portuguese_brazil: "Portuguese (Brazil)",
+  french_europe: "French (Europe)",
+  german: "German",
+  japanese: "Japanese",
+  korean: "Korean",
+  hindi: "Hindi",
+  // Handle raw API values
+  ENGLISH: "English (Global)",
+  SPANISH: "Spanish (LATAM)",
+  PORTUGUESE: "Portuguese (Brazil)",
+  FRENCH: "French (Europe)",
+}
+
+const statusLabels: Record<UIReportStatus, string> = {
+  delivered: "Delivered",
+  in_progress: "In Progress",
+  awaiting_human: "Awaiting Human Review",
+  compiling: "Compiling",
+}
+
+// Map API status to UI status
+function mapApiStatusToUI(apiStatus: ApiReportStatus): UIReportStatus {
+  switch (apiStatus) {
+    case "COMPLETED":
+      return "delivered"
+    case "IN_PROGRESS":
+      return "in_progress"
+    case "PENDING":
+      return "awaiting_human"
+    default:
+      return "in_progress"
+  }
+}
+
+// Normalize language pool to display format
+function normalizeLanguagePool(pool: string): string {
+  return languagePoolLabels[pool] || languagePoolLabels[pool.toLowerCase()] || pool
+}
+
 export default function ReportsListPage() {
-  const [reports, setReports] = useState<Report[]>(mockReports)
-  const [filteredReports, setFilteredReports] = useState<Report[]>(mockReports)
+  const { reports: apiReports, loading, error, refetch } = useCreatorReports()
+
+  // Map API reports to UI format
+  const reports = useMemo(() => {
+    return apiReports.map(r => ({
+      ...r,
+      uiStatus: mapApiStatusToUI(r.status),
+      videoDuration: r.videoDurationMinutes ?? 0,
+    }))
+  }, [apiReports])
+
+  const [filteredReports, setFilteredReports] = useState<typeof reports>([])
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [compareMode, setCompareMode] = useState(false)
   const [selectedForCompare, setSelectedForCompare] = useState<string[]>([])
 
   // Filter states
-  const [statusFilter, setStatusFilter] = useState<ReportStatus[]>([])
+  const [statusFilter, setStatusFilter] = useState<UIReportStatus[]>([])
   const [languageFilter, setLanguageFilter] = useState<LanguagePool[]>([])
   const [lengthFilter, setLengthFilter] = useState<VideoLength[]>([])
   const [sortBy, setSortBy] = useState<SortOption>("newest")
@@ -47,17 +98,25 @@ export default function ReportsListPage() {
     trackEvent("report_list_viewed")
   }, [])
 
+  // Update filtered reports when reports change
+  useEffect(() => {
+    setFilteredReports(reports)
+  }, [reports])
+
   useEffect(() => {
     let filtered = [...reports]
 
     // Status filter
     if (statusFilter.length > 0) {
-      filtered = filtered.filter((r) => statusFilter.includes(r.status))
+      filtered = filtered.filter((r) => statusFilter.includes(r.uiStatus))
     }
 
     // Language filter
     if (languageFilter.length > 0) {
-      filtered = filtered.filter((r) => languageFilter.includes(r.languagePool))
+      filtered = filtered.filter((r) => {
+        const normalizedPool = r.languagePool.toLowerCase().replace(/[^a-z]/g, "_")
+        return languageFilter.some((f: LanguagePool) => normalizedPool.includes(f.split("_")[0]))
+      })
     }
 
     // Length filter
@@ -84,9 +143,9 @@ export default function ReportsListPage() {
           return aHours - bHours
         case "highest_severity":
           // For simplicity, sort by engagement score (lower = more issues)
-          if (a.status !== "delivered" && b.status === "delivered") return 1
-          if (a.status === "delivered" && b.status !== "delivered") return -1
-          return a.engagementScore - b.engagementScore
+          if (a.uiStatus !== "delivered" && b.uiStatus === "delivered") return 1
+          if (a.uiStatus === "delivered" && b.uiStatus !== "delivered") return -1
+          return (a.engagementScore ?? 0) - (b.engagementScore ?? 0)
         default:
           return 0
       }
@@ -95,15 +154,15 @@ export default function ReportsListPage() {
     setFilteredReports(filtered)
   }, [reports, statusFilter, languageFilter, lengthFilter, sortBy])
 
-  const getStatusBadge = (status: ReportStatus) => {
-    const styles = {
+  const getStatusBadge = (status: UIReportStatus) => {
+    const styles: Record<UIReportStatus, string> = {
       delivered: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20",
       in_progress: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
       awaiting_human: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
       compiling: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
     }
 
-    const icons = {
+    const icons: Record<UIReportStatus, typeof CheckCircle2> = {
       delivered: CheckCircle2,
       in_progress: Clock,
       awaiting_human: Users,
@@ -130,9 +189,9 @@ export default function ReportsListPage() {
   }
 
   const toggleCompareSelection = (reportId: string) => {
-    setSelectedForCompare((prev) => {
+    setSelectedForCompare((prev: string[]) => {
       if (prev.includes(reportId)) {
-        return prev.filter((id) => id !== reportId)
+        return prev.filter((id: string) => id !== reportId)
       } else if (prev.length < 2) {
         return [...prev, reportId]
       }
@@ -164,6 +223,28 @@ export default function ReportsListPage() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-6 text-center">
+            <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
+            <h3 className="mt-2 text-lg font-semibold text-foreground">Failed to load reports</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{error.message}</p>
+            <Button onClick={refetch} className="mt-4" size="sm">
+              Try Again
+            </Button>
+          </div>
+        )}
+
+        {/* Content - only show when not loading and no error */}
+        {!loading && !error && (
+          <>
         {/* Summary Stats */}
         <div className="mb-8 grid gap-4 md:grid-cols-4">
           <div className="rounded-xl border border-border bg-card p-4">
@@ -173,22 +254,25 @@ export default function ReportsListPage() {
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-sm text-muted-foreground">Delivered</p>
             <p className="mt-1 text-3xl font-bold text-green-600 dark:text-green-400">
-              {reports.filter((r) => r.status === "delivered").length}
+              {reports.filter((r) => r.uiStatus === "delivered").length}
             </p>
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-sm text-muted-foreground">In Progress</p>
             <p className="mt-1 text-3xl font-bold text-blue-600 dark:text-blue-400">
-              {reports.filter((r) => r.status !== "delivered").length}
+              {reports.filter((r) => r.uiStatus !== "delivered").length}
             </p>
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-sm text-muted-foreground">Avg. Clarity Score</p>
             <p className="mt-1 text-3xl font-bold text-foreground">
-              {Math.round(
-                reports.filter((r) => r.status === "delivered").reduce((acc, r) => acc + r.clarityScore, 0) /
-                  reports.filter((r) => r.status === "delivered").length,
-              )}
+              {(() => {
+                const deliveredReports = reports.filter((r) => r.uiStatus === "delivered" && r.clarityScore)
+                if (deliveredReports.length === 0) return "—"
+                return Math.round(
+                  deliveredReports.reduce((acc, r) => acc + (r.clarityScore ?? 0), 0) / deliveredReports.length
+                )
+              })()}
             </p>
           </div>
         </div>
@@ -263,7 +347,7 @@ export default function ReportsListPage() {
               <div>
                 <h3 className="mb-3 font-semibold text-sm text-foreground">Status</h3>
                 <div className="space-y-2">
-                  {(["delivered", "in_progress", "awaiting_human", "compiling"] as ReportStatus[]).map((status) => (
+                  {(["delivered", "in_progress", "awaiting_human", "compiling"] as UIReportStatus[]).map((status) => (
                     <label key={status} className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
@@ -371,19 +455,19 @@ export default function ReportsListPage() {
               <div
                 key={report.id}
                 className={`rounded-xl border bg-card p-6 transition-all ${
-                  compareMode && selectedForCompare.includes(report.id)
+                  compareMode && selectedForCompare.includes(String(report.id))
                     ? "border-accent ring-2 ring-accent"
                     : "border-border hover:border-accent/50"
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4 flex-1">
-                    {compareMode && report.status === "delivered" && (
+                    {compareMode && report.uiStatus === "delivered" && (
                       <input
                         type="checkbox"
-                        checked={selectedForCompare.includes(report.id)}
-                        onChange={() => toggleCompareSelection(report.id)}
-                        disabled={!selectedForCompare.includes(report.id) && selectedForCompare.length >= 2}
+                        checked={selectedForCompare.includes(String(report.id))}
+                        onChange={() => toggleCompareSelection(String(report.id))}
+                        disabled={!selectedForCompare.includes(String(report.id)) && selectedForCompare.length >= 2}
                         className="mt-1 h-5 w-5 rounded border-border"
                       />
                     )}
@@ -393,14 +477,13 @@ export default function ReportsListPage() {
                         <div>
                           <h3 className="text-lg font-semibold text-foreground">{report.videoTitle}</h3>
                           <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                            <span>Duration: {report.duration}</span>
+                            {report.duration && <><span>Duration: {report.duration}</span><span>•</span></>}
+                            <span>{normalizeLanguagePool(report.languagePool)}</span>
                             <span>•</span>
-                            <span>{languagePoolLabels[report.languagePool]}</span>
-                            <span>•</span>
-                            <span>Submitted: {report.dateSubmitted}</span>
+                            <span>Submitted: {new Date(report.dateSubmitted).toLocaleDateString()}</span>
                           </div>
                         </div>
-                        {getStatusBadge(report.status)}
+                        {getStatusBadge(report.uiStatus)}
                       </div>
 
                       <div className="grid gap-4 md:grid-cols-2 mb-4">
@@ -411,7 +494,7 @@ export default function ReportsListPage() {
                         <div className="flex items-center gap-3 text-sm">
                           <Clock className="h-4 w-4 text-muted-foreground" />
                           <span className="text-foreground">
-                            SLA: {report.slaWindow}
+                            {report.slaWindow ? `SLA: ${report.slaWindow}` : "SLA: Standard"}
                             {report.actualDeliveryTime && (
                               <span className="text-muted-foreground"> (delivered in {report.actualDeliveryTime})</span>
                             )}
@@ -419,7 +502,7 @@ export default function ReportsListPage() {
                         </div>
                       </div>
 
-                      {report.status === "delivered" && (
+                      {report.uiStatus === "delivered" && (
                         <div className="flex flex-wrap gap-2 mb-4">
                           {report.aiComplete && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400">
@@ -446,7 +529,7 @@ export default function ReportsListPage() {
                             View Report
                           </Link>
                         </Button>
-                        {report.status === "delivered" && (
+                        {report.uiStatus === "delivered" && (
                           <>
                             <Button variant="outline" size="sm" disabled>
                               <Download className="h-4 w-4 mr-2" />
@@ -462,6 +545,8 @@ export default function ReportsListPage() {
             ))
           )}
         </div>
+          </>
+        )}
       </main>
     </div>
   )

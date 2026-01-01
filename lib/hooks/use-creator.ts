@@ -1,7 +1,7 @@
 "use client"
 
 import { useApi } from "./use-api"
-import type { JobDto, ReportDto } from "@/lib/types/api"
+import type { JobDto, ReportDto, ReportCompareResponse } from "@/lib/types/api"
 
 /**
  * Hook to fetch creator's jobs.
@@ -42,6 +42,25 @@ export function useCreatorReport(reportId: number | null) {
 
   return {
     report: data,
+    loading,
+    error,
+    refetch,
+  }
+}
+
+/**
+ * Hook to compare two reports side by side.
+ */
+export function useCompareReports(leftId: number | null, rightId: number | null) {
+  const enabled = leftId !== null && rightId !== null
+  const { data, loading, error, refetch } = useApi<ReportCompareResponse>(
+    `/creator/reports/compare?left=${leftId}&right=${rightId}`,
+    { enabled }
+  )
+
+  return {
+    leftReport: data?.leftReport ?? null,
+    rightReport: data?.rightReport ?? null,
     loading,
     error,
     refetch,

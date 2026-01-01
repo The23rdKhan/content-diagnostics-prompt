@@ -363,3 +363,12 @@ export interface LanguagePoolCapacity {
 export interface CapacityResponse {
   languagePools: LanguagePoolCapacity[]
 }
+
+// =============================================================================
+// Report Comparison Types
+// =============================================================================
+
+export interface ReportCompareResponse {
+  leftReport: ReportDto
+  rightReport: ReportDto
+}

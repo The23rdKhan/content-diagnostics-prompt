@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileVideo, X, CheckCircle, ChevronRight, ChevronLeft, AlertCircle } from "lucide-react"
+import { Upload, FileVideo, X, CheckCircle, ChevronRight, ChevronLeft, AlertCircle, RefreshCw } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { CapacityGatingModal, type CapacityOption } from "@/components/creator/capacity-gating-modal"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useVideoUpload } from "@/lib/hooks/use-upload"
 
 type UploadStep = "select-file" | "video-details" | "capacity-review" | "add-ons" | "submit"
 
@@ -27,8 +28,9 @@ export function UploadSection() {
   const [currentStep, setCurrentStep] = useState<UploadStep>("select-file")
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [isUploading, setIsUploading] = useState(false)
+
+  // Upload hook
+  const { state: uploadState, uploadVideo, retry, reset: resetUpload } = useVideoUpload()
 
   // Form state
   const [videoTitle, setVideoTitle] = useState("")
@@ -47,6 +49,12 @@ export function UploadSection() {
     fullWatchSummary: false,
     liveFeedback: false,
   })
+
+  // Derived state from upload hook
+  const uploadProgress = uploadState.progress
+  const isUploading = uploadState.stage !== "idle" && uploadState.stage !== "complete" && uploadState.stage !== "error"
+  const uploadError = uploadState.error
+  const uploadComplete = uploadState.stage === "complete"
 
   const steps: { key: UploadStep; label: string }[] = [
     { key: "select-file", label: "Select File" },
@@ -92,10 +100,17 @@ export function UploadSection() {
     setUploadedFile(null)
     setVideoTitle("")
     setOptionalNotes("")
+    setContentType("")
+    setPrimaryGoal("")
     setCurrentStep("select-file")
-    setUploadProgress(0)
-    setIsUploading(false)
     setCapacityConfirmed(false)
+    setAddons({
+      extraReviewers: null,
+      fasterDelivery: false,
+      fullWatchSummary: false,
+      liveFeedback: false,
+    })
+    resetUpload()
   }
 
   const goToNextStep = () => {
@@ -128,9 +143,11 @@ export function UploadSection() {
     trackEvent("creator_addon_selected", { addon, value })
   }
 
-  const simulateUpload = () => {
-    setIsUploading(true)
-    setUploadProgress(0)
+  const handleUpload = async () => {
+    if (!uploadedFile) return
+
+    const selectedSLAOption = slaOptions.find((o) => o.value === selectedSLA)!
+
     trackEvent("creator_job_submitted", {
       title: videoTitle,
       language: selectedLanguage,
@@ -138,17 +155,63 @@ export function UploadSection() {
       addons,
     })
 
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsUploading(false)
-          trackEvent("creator_upload_completed", { title: videoTitle })
-          return 100
+    try {
+      const result = await uploadVideo(
+        uploadedFile,
+        {
+          title: videoTitle,
+          language: selectedLanguage,
+          contentType: contentType || undefined,
+          primaryGoal: primaryGoal || undefined,
+          notes: optionalNotes || undefined,
+        },
+        {
+          slaHours: selectedSLAOption.hours,
+          extraReviewers: addons.extraReviewers || undefined,
+          fasterDelivery: addons.fasterDelivery,
+          fullWatchSummary: addons.fullWatchSummary,
         }
-        return prev + 10
+      )
+
+      trackEvent("creator_upload_completed", {
+        title: videoTitle,
+        videoId: result.videoId,
+        jobId: result.jobId,
       })
-    }, 300)
+    } catch (error) {
+      console.error("Upload failed:", error)
+      trackEvent("creator_upload_failed", {
+        title: videoTitle,
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+    }
+  }
+
+  const handleRetry = async () => {
+    if (!uploadedFile) return
+
+    const selectedSLAOption = slaOptions.find((o) => o.value === selectedSLA)!
+
+    try {
+      await retry(
+        uploadedFile,
+        {
+          title: videoTitle,
+          language: selectedLanguage,
+          contentType: contentType || undefined,
+          primaryGoal: primaryGoal || undefined,
+          notes: optionalNotes || undefined,
+        },
+        {
+          slaHours: selectedSLAOption.hours,
+          extraReviewers: addons.extraReviewers || undefined,
+          fasterDelivery: addons.fasterDelivery,
+          fullWatchSummary: addons.fullWatchSummary,
+        }
+      )
+    } catch (error) {
+      console.error("Retry failed:", error)
+    }
   }
 
   const renderStepContent = () => {
@@ -467,6 +530,23 @@ export function UploadSection() {
         const selectedSLAOption = slaOptions.find((o) => o.value === selectedSLA)!
         const baseReviewers = 50
         const totalReviewers = baseReviewers + (addons.extraReviewers || 0)
+
+        // Get stage-specific status message
+        const getUploadStatusMessage = () => {
+          switch (uploadState.stage) {
+            case "presigning":
+              return "Preparing upload..."
+            case "uploading":
+              return "Uploading to storage..."
+            case "creating-video":
+              return "Creating video record..."
+            case "submitting-job":
+              return "Submitting job..."
+            default:
+              return "Uploading..."
+          }
+        }
+
         return (
           <div className="space-y-4">
             <Alert className="border-accent/30 bg-accent/5">
@@ -474,10 +554,12 @@ export function UploadSection() {
               <AlertDescription>Internal testing only. Not representative of public performance.</AlertDescription>
             </Alert>
 
-            <Alert>
-              <CheckCircle className="h-4 w-4 text-accent" />
-              <AlertDescription>Review your submission details before uploading</AlertDescription>
-            </Alert>
+            {!uploadError && !uploadComplete && (
+              <Alert>
+                <CheckCircle className="h-4 w-4 text-accent" />
+                <AlertDescription>Review your submission details before uploading</AlertDescription>
+              </Alert>
+            )}
 
             <div className="rounded-lg border border-border p-4 space-y-3 text-sm">
               <div className="flex justify-between">
@@ -522,10 +604,11 @@ export function UploadSection() {
               )}
             </div>
 
-            {uploadProgress > 0 && uploadProgress < 100 && (
+            {/* Upload Progress */}
+            {isUploading && (
               <div>
                 <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Uploading...</span>
+                  <span className="text-muted-foreground">{getUploadStatusMessage()}</span>
                   <span className="text-foreground">{uploadProgress}%</span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-muted">
@@ -537,11 +620,23 @@ export function UploadSection() {
               </div>
             )}
 
-            {uploadProgress === 100 && (
+            {/* Error State */}
+            {uploadError && (
+              <Alert className="border-destructive bg-destructive/5">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                <AlertDescription className="text-destructive">
+                  Upload failed: {uploadError}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Success State */}
+            {uploadComplete && (
               <Alert className="bg-accent/5 border-accent/30">
                 <CheckCircle className="h-4 w-4 text-accent" />
                 <AlertDescription className="text-accent">
                   Upload complete! Your video is now in the review queue.
+                  {uploadState.jobId && <span className="block mt-1">Job ID: {uploadState.jobId}</span>}
                 </AlertDescription>
               </Alert>
             )}
@@ -551,15 +646,35 @@ export function UploadSection() {
                 variant="outline"
                 onClick={goToPreviousStep}
                 className="flex-1 bg-transparent"
-                disabled={isUploading || uploadProgress === 100}
+                disabled={isUploading || uploadComplete}
               >
                 <ChevronLeft className="mr-2 h-4 w-4" /> Back
               </Button>
-              {uploadProgress < 100 ? (
-                <Button onClick={simulateUpload} className="flex-1" disabled={isUploading}>
-                  {isUploading ? "Uploading..." : "Submit Job"}
+
+              {/* Error: Show Retry button */}
+              {uploadError && (
+                <Button onClick={handleRetry} className="flex-1">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry Upload
                 </Button>
-              ) : (
+              )}
+
+              {/* Idle: Show Submit button */}
+              {!isUploading && !uploadComplete && !uploadError && (
+                <Button onClick={handleUpload} className="flex-1">
+                  Submit Job
+                </Button>
+              )}
+
+              {/* Uploading: Show disabled button */}
+              {isUploading && (
+                <Button className="flex-1" disabled>
+                  Uploading...
+                </Button>
+              )}
+
+              {/* Complete: Show Upload Another button */}
+              {uploadComplete && (
                 <Button onClick={clearFile} className="flex-1">
                   Upload Another Video
                 </Button>
