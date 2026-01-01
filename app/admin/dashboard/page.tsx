@@ -9,13 +9,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Users, FileText, Clock, AlertTriangle, TrendingUp, CheckCircle2, XCircle, DollarSign, AlertCircle } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { useState } from "react"
-import { useAdminKpis } from "@/lib/hooks/use-admin"
+import { useAdminKpis, useAdminDebugTools } from "@/lib/hooks/use-admin"
 
 export default function AdminDashboard() {
+  const isStaging = process.env.NEXT_PUBLIC_ENV === "staging"
   const [checkoutEnabled, setCheckoutEnabled] = useState(true)
   const [liveAddOnEnabled, setLiveAddOnEnabled] = useState(true)
   const [surgePayMultiplier, setSurgePayMultiplier] = useState(1.0)
+  const [debugMessage, setDebugMessage] = useState<string | null>(null)
+  const [debugError, setDebugError] = useState<string | null>(null)
   const { kpis, loading, error, refetch } = useAdminKpis()
+  const { createSampleData, triggerReportCompilation, requeueExpiredLeases, loading: debugLoading, error: debugRequestError } = useAdminDebugTools()
 
   const handleCheckoutToggle = (enabled: boolean) => {
     setCheckoutEnabled(enabled)
@@ -35,6 +39,39 @@ export default function AdminDashboard() {
 
   const handleSLAExtension = () => {
     trackEvent("admin_sla_extended", { from: "24h", to: "48h" })
+  }
+
+  const handleCreateSampleData = async () => {
+    setDebugMessage(null)
+    setDebugError(null)
+    try {
+      const result = await createSampleData()
+      setDebugMessage(`Created job ${result.jobId} with ${result.taskIds.length} tasks.`)
+    } catch (err) {
+      setDebugError(err instanceof Error ? err.message : "Failed to create sample data.")
+    }
+  }
+
+  const handleCompileReport = async () => {
+    setDebugMessage(null)
+    setDebugError(null)
+    try {
+      const result = await triggerReportCompilation()
+      setDebugMessage(`Compiled report ${result.reportId} for job ${result.jobId}.`)
+    } catch (err) {
+      setDebugError(err instanceof Error ? err.message : "Failed to compile report.")
+    }
+  }
+
+  const handleRequeueExpired = async () => {
+    setDebugMessage(null)
+    setDebugError(null)
+    try {
+      const result = await requeueExpiredLeases()
+      setDebugMessage(`Requeued ${result.requeuedCount} expired leases.`)
+    } catch (err) {
+      setDebugError(err instanceof Error ? err.message : "Failed to requeue leases.")
+    }
   }
 
   if (error) {
@@ -309,6 +346,38 @@ export default function AdminDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {isStaging && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Debug Tools</CardTitle>
+            <CardDescription>Staging-only shortcuts for testing workflows</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {(debugError || debugRequestError) && (
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                {debugError ?? debugRequestError?.message}
+              </div>
+            )}
+            {debugMessage && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                {debugMessage}
+              </div>
+            )}
+            <div className="grid gap-3 md:grid-cols-3">
+              <Button variant="outline" className="bg-transparent" onClick={handleCreateSampleData} disabled={debugLoading}>
+                Create sample job + tasks
+              </Button>
+              <Button variant="outline" className="bg-transparent" onClick={handleCompileReport} disabled={debugLoading}>
+                Trigger report compilation
+              </Button>
+              <Button variant="outline" className="bg-transparent" onClick={handleRequeueExpired} disabled={debugLoading}>
+                Requeue expired leases
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

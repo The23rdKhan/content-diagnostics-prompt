@@ -103,6 +103,8 @@ app:
     secure: ${COOKIE_SECURE:false}  # true in production (HTTPS only)
     same-site: ${COOKIE_SAME_SITE:Lax}  # CSRF protection
     max-age-seconds: 604800  # 7 days, matches refresh token expiration
+  debug-tools:
+    enabled: ${DEBUG_TOOLS_ENABLED:false}
 
 # Actuator
 management:
