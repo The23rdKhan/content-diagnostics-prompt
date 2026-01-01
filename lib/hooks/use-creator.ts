@@ -53,10 +53,12 @@ export function useCreatorReport(reportId: number | null) {
  */
 export function useCompareReports(leftId: number | null, rightId: number | null) {
   const enabled = leftId !== null && rightId !== null
-  const { data, loading, error, refetch } = useApi<ReportCompareResponse>(
-    `/creator/reports/compare?left=${leftId}&right=${rightId}`,
-    { enabled }
-  )
+  // Only build URL with actual IDs to avoid "?left=null&right=null"
+  const url = enabled
+    ? `/creator/reports/compare?left=${leftId}&right=${rightId}`
+    : "/creator/reports/compare"
+
+  const { data, loading, error, refetch } = useApi<ReportCompareResponse>(url, { enabled })
 
   return {
     leftReport: data?.leftReport ?? null,

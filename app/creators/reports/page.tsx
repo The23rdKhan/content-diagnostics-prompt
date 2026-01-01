@@ -28,7 +28,7 @@ type LanguagePool = "english_global" | "spanish_latam" | "portuguese_brazil" | "
 type VideoLength = "short" | "medium" | "long"
 type SortOption = "newest" | "oldest" | "fastest" | "highest_severity"
 
-// Label mappings
+// Label mappings for display
 const languagePoolLabels: Record<string, string> = {
   english_global: "English (Global)",
   spanish_latam: "Spanish (LATAM)",
@@ -43,6 +43,37 @@ const languagePoolLabels: Record<string, string> = {
   SPANISH: "Spanish (LATAM)",
   PORTUGUESE: "Portuguese (Brazil)",
   FRENCH: "French (Europe)",
+  GERMAN: "German",
+  JAPANESE: "Japanese",
+  KOREAN: "Korean",
+  HINDI: "Hindi",
+}
+
+// Map API language values to filter values (exact matching)
+const apiLanguageToFilter: Record<string, LanguagePool> = {
+  // Lowercase variants
+  english_global: "english_global",
+  spanish_latam: "spanish_latam",
+  portuguese_brazil: "portuguese_brazil",
+  french_europe: "french_europe",
+  german: "german",
+  japanese: "japanese",
+  korean: "korean",
+  hindi: "hindi",
+  // Uppercase API values
+  ENGLISH: "english_global",
+  SPANISH: "spanish_latam",
+  PORTUGUESE: "portuguese_brazil",
+  FRENCH: "french_europe",
+  GERMAN: "german",
+  JAPANESE: "japanese",
+  KOREAN: "korean",
+  HINDI: "hindi",
+  // Common variations
+  "English (Global)": "english_global",
+  "Spanish (LATAM)": "spanish_latam",
+  "Portuguese (Brazil)": "portuguese_brazil",
+  "French (Europe)": "french_europe",
 }
 
 const statusLabels: Record<UIReportStatus, string> = {
@@ -98,11 +129,7 @@ export default function ReportsListPage() {
     trackEvent("report_list_viewed")
   }, [])
 
-  // Update filtered reports when reports change
-  useEffect(() => {
-    setFilteredReports(reports)
-  }, [reports])
-
+  // Combined filter and sort effect
   useEffect(() => {
     let filtered = [...reports]
 
@@ -111,11 +138,11 @@ export default function ReportsListPage() {
       filtered = filtered.filter((r) => statusFilter.includes(r.uiStatus))
     }
 
-    // Language filter
+    // Language filter (exact matching via lookup table)
     if (languageFilter.length > 0) {
       filtered = filtered.filter((r) => {
-        const normalizedPool = r.languagePool.toLowerCase().replace(/[^a-z]/g, "_")
-        return languageFilter.some((f: LanguagePool) => normalizedPool.includes(f.split("_")[0]))
+        const mappedLanguage = apiLanguageToFilter[r.languagePool]
+        return mappedLanguage && languageFilter.includes(mappedLanguage)
       })
     }
 

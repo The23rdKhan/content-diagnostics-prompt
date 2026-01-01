@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { api } from "@/lib/api"
 
 // =============================================================================
@@ -17,6 +17,7 @@ export interface VideoCreateRequest {
   title: string
   s3Key: string
   language: string
+  durationSeconds?: number
   contentType?: string
   primaryGoal?: string
   notes?: string
@@ -75,7 +76,17 @@ export function useVideoUpload() {
     jobId: null,
   })
 
+  // Store XHR reference for abort capability
+  const xhrRef = useRef<XMLHttpRequest | null>(null)
+  const abortedRef = useRef(false)
+
   const reset = useCallback(() => {
+    // Abort any in-progress upload
+    if (xhrRef.current) {
+      xhrRef.current.abort()
+      xhrRef.current = null
+    }
+    abortedRef.current = false
     setState({
       stage: "idle",
       progress: 0,
@@ -86,103 +97,20 @@ export function useVideoUpload() {
   }, [])
 
   /**
-   * Step 1: Get presigned URL from backend
+   * Abort the current upload
    */
-  const getPresignedUrl = async (fileName: string, contentType: string): Promise<PresignResponse> => {
-    setState(prev => ({ ...prev, stage: "presigning", progress: 5, error: null }))
-
-    const response = await api<PresignResponse>("/storage/presign", {
-      method: "POST",
-      body: JSON.stringify({
-        type: "VIDEO",
-        fileName,
-        contentType,
-      }),
-    })
-
-    setState(prev => ({ ...prev, progress: 10 }))
-    return response
-  }
-
-  /**
-   * Step 2: Upload file directly to S3 using presigned URL
-   */
-  const uploadToS3 = async (
-    file: File,
-    uploadUrl: string,
-    onProgress?: (progress: number) => void
-  ): Promise<void> => {
-    setState(prev => ({ ...prev, stage: "uploading", progress: 10 }))
-
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-
-      xhr.upload.addEventListener("progress", (event) => {
-        if (event.lengthComputable) {
-          // Map S3 upload progress from 10% to 70%
-          const s3Progress = (event.loaded / event.total) * 60 + 10
-          setState(prev => ({ ...prev, progress: Math.round(s3Progress) }))
-          onProgress?.(s3Progress)
-        }
-      })
-
-      xhr.addEventListener("load", () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          setState(prev => ({ ...prev, progress: 70 }))
-          resolve()
-        } else {
-          reject(new Error(`S3 upload failed with status ${xhr.status}`))
-        }
-      })
-
-      xhr.addEventListener("error", () => {
-        reject(new Error("S3 upload failed - network error"))
-      })
-
-      xhr.addEventListener("abort", () => {
-        reject(new Error("S3 upload was aborted"))
-      })
-
-      xhr.open("PUT", uploadUrl)
-      xhr.setRequestHeader("Content-Type", file.type)
-      xhr.send(file)
-    })
-  }
-
-  /**
-   * Step 3: Create video record in backend
-   */
-  const createVideo = async (data: VideoCreateRequest): Promise<VideoResponse> => {
-    setState(prev => ({ ...prev, stage: "creating-video", progress: 75 }))
-
-    const response = await api<VideoResponse>("/creator/videos", {
-      method: "POST",
-      body: JSON.stringify(data),
-    })
-
-    setState(prev => ({ ...prev, progress: 85, videoId: response.id }))
-    return response
-  }
-
-  /**
-   * Step 4: Submit job for processing
-   */
-  const submitJob = async (videoId: number, data: JobSubmitRequest): Promise<JobResponse> => {
-    setState(prev => ({ ...prev, stage: "submitting-job", progress: 90 }))
-
-    const response = await api<JobResponse>(`/creator/videos/${videoId}/submit`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    })
-
+  const abort = useCallback(() => {
+    abortedRef.current = true
+    if (xhrRef.current) {
+      xhrRef.current.abort()
+      xhrRef.current = null
+    }
     setState(prev => ({
       ...prev,
-      stage: "complete",
-      progress: 100,
-      jobId: response.id
+      stage: "error",
+      error: "Upload cancelled"
     }))
-    return response
-  }
+  }, [])
 
   /**
    * Full upload pipeline - orchestrates all steps
@@ -192,6 +120,7 @@ export function useVideoUpload() {
     metadata: {
       title: string
       language: string
+      durationSeconds?: number
       contentType?: string
       primaryGoal?: string
       notes?: string
@@ -204,6 +133,129 @@ export function useVideoUpload() {
     },
     onProgress?: (progress: number) => void
   ): Promise<{ videoId: number; jobId: number }> => {
+    // Reset abort flag
+    abortedRef.current = false
+
+    /**
+     * Step 1: Get presigned URL from backend
+     */
+    const getPresignedUrl = async (fileName: string, contentType: string): Promise<PresignResponse> => {
+      if (abortedRef.current) throw new Error("Upload cancelled")
+
+      setState(prev => ({ ...prev, stage: "presigning", progress: 5, error: null }))
+
+      const response = await api<PresignResponse>("/storage/presign", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "VIDEO",
+          fileName,
+          contentType,
+        }),
+      })
+
+      setState(prev => ({ ...prev, progress: 10 }))
+      return response
+    }
+
+    /**
+     * Step 2: Upload file directly to S3 using presigned URL
+     */
+    const uploadToS3 = async (
+      fileToUpload: File,
+      uploadUrl: string,
+      progressCallback?: (progress: number) => void
+    ): Promise<void> => {
+      if (abortedRef.current) throw new Error("Upload cancelled")
+
+      setState(prev => ({ ...prev, stage: "uploading", progress: 10 }))
+
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhrRef.current = xhr
+
+        // Set timeout for large uploads (10 minutes)
+        xhr.timeout = 600000
+
+        xhr.upload.addEventListener("progress", (event) => {
+          if (event.lengthComputable) {
+            // Map S3 upload progress from 10% to 70%
+            const s3Progress = (event.loaded / event.total) * 60 + 10
+            setState(prev => ({ ...prev, progress: Math.round(s3Progress) }))
+            progressCallback?.(s3Progress)
+          }
+        })
+
+        xhr.addEventListener("load", () => {
+          xhrRef.current = null
+          if (xhr.status >= 200 && xhr.status < 300) {
+            setState(prev => ({ ...prev, progress: 70 }))
+            resolve()
+          } else {
+            reject(new Error(`S3 upload failed with status ${xhr.status}`))
+          }
+        })
+
+        xhr.addEventListener("error", () => {
+          xhrRef.current = null
+          reject(new Error("S3 upload failed - network error"))
+        })
+
+        xhr.addEventListener("abort", () => {
+          xhrRef.current = null
+          reject(new Error("Upload cancelled"))
+        })
+
+        xhr.addEventListener("timeout", () => {
+          xhrRef.current = null
+          reject(new Error("S3 upload timed out - please try again"))
+        })
+
+        xhr.open("PUT", uploadUrl)
+        xhr.setRequestHeader("Content-Type", fileToUpload.type)
+        xhr.send(fileToUpload)
+      })
+    }
+
+    /**
+     * Step 3: Create video record in backend
+     */
+    const createVideo = async (data: VideoCreateRequest): Promise<VideoResponse> => {
+      if (abortedRef.current) throw new Error("Upload cancelled")
+
+      setState(prev => ({ ...prev, stage: "creating-video", progress: 75 }))
+
+      const response = await api<VideoResponse>("/creator/videos", {
+        method: "POST",
+        body: JSON.stringify(data),
+      })
+
+      setState(prev => ({ ...prev, progress: 85, videoId: response.id }))
+      return response
+    }
+
+    /**
+     * Step 4: Submit job for processing
+     */
+    const submitJob = async (videoId: number, data: JobSubmitRequest): Promise<JobResponse> => {
+      if (abortedRef.current) throw new Error("Upload cancelled")
+
+      setState(prev => ({ ...prev, stage: "submitting-job", progress: 90 }))
+
+      const response = await api<JobResponse>(`/creator/videos/${videoId}/submit`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      })
+
+      setState(prev => ({
+        ...prev,
+        stage: "complete",
+        progress: 100,
+        jobId: response.id
+      }))
+      return response
+    }
+
+    // Main upload flow
     try {
       // Reset state
       setState({
@@ -225,6 +277,7 @@ export function useVideoUpload() {
         title: metadata.title,
         s3Key: presign.s3Key,
         language: metadata.language,
+        durationSeconds: metadata.durationSeconds,
         contentType: metadata.contentType,
         primaryGoal: metadata.primaryGoal,
         notes: metadata.notes,
@@ -258,6 +311,7 @@ export function useVideoUpload() {
     metadata: {
       title: string
       language: string
+      durationSeconds?: number
       contentType?: string
       primaryGoal?: string
       notes?: string
@@ -278,10 +332,6 @@ export function useVideoUpload() {
     uploadVideo,
     retry,
     reset,
-    // Expose individual steps for granular control
-    getPresignedUrl,
-    uploadToS3,
-    createVideo,
-    submitJob,
+    abort,
   }
 }
