@@ -1,0 +1,159 @@
+spring:
+  application:
+    name: content-diagnostics-api
+
+  # Database Configuration
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/contentdiagnostics}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Flyway
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  # Jackson
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /api
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:your-256-bit-secret-key-for-development-only-change-in-prod}
+  issuer: ${JWT_ISSUER:content-diagnostics}
+  access-token-expiration-ms: 900000  # 15 minutes
+  refresh-token-expiration-ms: 604800000  # 7 days
+
+# AWS Configuration
+aws:
+  region: ${AWS_REGION:us-east-1}
+  s3:
+    bucket: ${S3_BUCKET:content-diagnostics-uploads}
+    presign-expiration-minutes: 60
+  sqs:
+    video-processing-queue: ${SQS_VIDEO_PROCESSING_QUEUE:}
+    segmentation-queue: ${SQS_SEGMENTATION_QUEUE:}
+    qc-queue: ${SQS_QC_QUEUE:}
+    report-compilation-queue: ${SQS_REPORT_COMPILATION_QUEUE:}
+    notification-queue: ${SQS_NOTIFICATION_QUEUE:}
+    email-queue: ${SQS_EMAIL_QUEUE:}
+
+# Stripe Configuration
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+  price-ids:
+    basic: ${STRIPE_PRICE_BASIC:}
+    professional: ${STRIPE_PRICE_PROFESSIONAL:}
+    enterprise: ${STRIPE_PRICE_ENTERPRISE:}
+
+# Resend Configuration
+resend:
+  api-key: ${RESEND_API_KEY:}
+  from-email: ${RESEND_FROM_EMAIL:noreply@contentdiagnostics.com}
+
+# PostHog Configuration (optional)
+posthog:
+  api-key: ${POSTHOG_API_KEY:}
+  host: ${POSTHOG_HOST:https://app.posthog.com}
+
+# Sentry Configuration (optional)
+sentry:
+  dsn: ${SENTRY_DSN:}
+
+# Application-specific Configuration
+app:
+  task:
+    lease-duration-minutes: 10
+    min-watch-ratio: 0.70
+    min-completion-time-seconds: 30
+  reviewer:
+    initial-quality-score: 100
+    lock-threshold: 60
+    score-decrease-on-reject: 5
+    score-increase-on-approve: 1
+  cookie:
+    # HttpOnly cookie settings for refresh tokens
+    secure: ${COOKIE_SECURE:false}  # true in production (HTTPS only)
+    same-site: ${COOKIE_SAME_SITE:Lax}  # CSRF protection
+    max-age-seconds: 604800  # 7 days, matches refresh token expiration
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+
+# OpenAPI/Swagger
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    tags-sorter: alpha
+    operations-sorter: alpha
+  show-actuator: false
+
+# App info (for OpenAPI)
+info:
+  app:
+    name: Content Diagnostics API
+    version: 1.0.0
+    description: Platform for video content review and diagnostics
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.contentdiagnostics: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%X{correlationId}] %-5level %logger{36} - %msg%n"
+
+---
+# Test profile
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false

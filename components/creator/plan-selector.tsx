@@ -1,0 +1,97 @@
+"use client"
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Check } from "lucide-react"
+
+export interface PlanOption {
+  id: string
+  name: string
+  price: number
+  reviewersPerVideo: number
+  deliveryDays: number
+  features: string[]
+}
+
+export const CREATOR_PLANS: PlanOption[] = [
+  {
+    id: "basic",
+    name: "Basic",
+    price: 49,
+    reviewersPerVideo: 3,
+    deliveryDays: 7,
+    features: ["3 reviewers per video", "7-day delivery", "AI diagnostics", "Structured reports"],
+  },
+  {
+    id: "professional",
+    name: "Professional",
+    price: 99,
+    reviewersPerVideo: 5,
+    deliveryDays: 3,
+    features: ["5 reviewers per video", "3-day delivery", "AI diagnostics", "Structured reports", "Email support"],
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    price: 199,
+    reviewersPerVideo: 10,
+    deliveryDays: 1,
+    features: [
+      "10 reviewers per video",
+      "1-day delivery",
+      "AI diagnostics",
+      "Structured reports",
+      "Priority support",
+      "Custom review criteria",
+    ],
+  },
+]
+
+interface PlanSelectorProps {
+  selectedPlanId?: string
+  onSelectPlan: (planId: string) => void
+}
+
+export function PlanSelector({ selectedPlanId, onSelectPlan }: PlanSelectorProps) {
+  return (
+    <div className="grid gap-6 md:grid-cols-3">
+      {CREATOR_PLANS.map((plan) => (
+        <Card
+          key={plan.id}
+          className={`cursor-pointer transition-all border-2 ${
+            selectedPlanId === plan.id ? "border-accent bg-secondary/50" : "border-border hover:border-accent/50"
+          }`}
+          onClick={() => onSelectPlan(plan.id)}
+        >
+          <CardHeader>
+            <CardTitle>{plan.name}</CardTitle>
+            <div className="text-3xl font-bold text-accent mt-2">${plan.price}</div>
+            <CardDescription>per video submission</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="text-sm font-medium text-muted-foreground">
+                {plan.reviewersPerVideo} reviewers • {plan.deliveryDays}-day delivery
+              </div>
+            </div>
+            <ul className="space-y-2">
+              {plan.features.map((feature) => (
+                <li key={feature} className="flex gap-2 text-sm">
+                  <Check className="h-4 w-4 text-accent flex-shrink-0 mt-0.5" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+            <Button
+              className="w-full"
+              variant={selectedPlanId === plan.id ? "default" : "outline"}
+              onClick={() => onSelectPlan(plan.id)}
+            >
+              {selectedPlanId === plan.id ? "Selected" : "Select Plan"}
+            </Button>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}

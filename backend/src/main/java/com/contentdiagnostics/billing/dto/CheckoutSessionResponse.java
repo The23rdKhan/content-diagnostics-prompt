@@ -1,0 +1,19 @@
+package com.contentdiagnostics.billing.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * Response DTO for checkout session creation.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CheckoutSessionResponse {
+
+    private String sessionId;
+    private String url;
+}
