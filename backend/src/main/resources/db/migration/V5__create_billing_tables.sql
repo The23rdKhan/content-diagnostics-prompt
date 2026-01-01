@@ -18,7 +18,7 @@ CREATE INDEX idx_stripe_events_event_id ON stripe_events(event_id);
 CREATE TABLE payouts (
     id BIGSERIAL PRIMARY KEY,
     reviewer_id BIGINT NOT NULL REFERENCES reviewer_profiles(id),
-    amount DECIMAL(10,2) NOT NULL,
+    amount DOUBLE PRECISION NOT NULL,
     tasks_included INTEGER NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
