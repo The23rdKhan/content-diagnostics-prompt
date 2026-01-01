@@ -27,6 +27,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/
  */
 interface ApiRequestOptions extends RequestInit {
   _retried?: boolean
+  _networkRetried?: boolean
 }
 
 /**
@@ -40,6 +41,8 @@ interface ApiRequestOptions extends RequestInit {
  */
 async function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   const accessToken = authStore.getAccessToken()
+  const method = (options.method || "GET").toUpperCase()
+  const shouldRetryNetwork = method === "GET"
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -51,11 +54,25 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
     headers["Authorization"] = `Bearer ${accessToken}`
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    credentials: "include", // Send HttpOnly cookies
-    headers,
-  })
+  let response: Response
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      credentials: "include", // Send HttpOnly cookies
+      headers,
+    })
+  } catch (err) {
+    if (shouldRetryNetwork && !options._networkRetried) {
+      await new Promise((resolve) => setTimeout(resolve, 250))
+      return request<T>(path, { ...options, _networkRetried: true })
+    }
+    throw err
+  }
+
+  if (response.status >= 500 && shouldRetryNetwork && !options._networkRetried) {
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    return request<T>(path, { ...options, _networkRetried: true })
+  }
 
   // Handle 401 Unauthorized - try refresh once
   if (response.status === 401 && !options._retried) {
@@ -68,7 +85,18 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
 
     // Refresh failed - clear state and throw
     authStore.clear()
+    if (typeof window !== "undefined") {
+      window.location.assign("/auth/sign-in")
+    }
     throw new AuthenticationError("Session expired. Please sign in again.")
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    authStore.clear()
+    if (typeof window !== "undefined") {
+      window.location.assign("/auth/sign-in")
+    }
+    throw new AuthenticationError(response.status === 403 ? "Access denied." : "Session expired. Please sign in again.")
   }
 
   // Parse response
@@ -76,10 +104,13 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
   try {
     json = await response.json()
   } catch {
-    throw new ApiRequestError({
-      code: "PARSE_ERROR",
-      message: "Failed to parse server response",
-    })
+    throw new ApiRequestError(
+      {
+        code: "PARSE_ERROR",
+        message: "Failed to parse server response",
+      },
+      response.status
+    )
   }
 
   // Handle API error responses
@@ -88,16 +119,20 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
       json.error || {
         code: "UNKNOWN_ERROR",
         message: "An unknown error occurred",
-      }
+      },
+      response.status
     )
   }
 
   // Return the data (validate it exists for type safety)
   if (json.data === undefined) {
-    throw new ApiRequestError({
-      code: "MISSING_DATA",
-      message: "Server response missing expected data",
-    })
+    throw new ApiRequestError(
+      {
+        code: "MISSING_DATA",
+        message: "Server response missing expected data",
+      },
+      response.status
+    )
   }
 
   return json.data

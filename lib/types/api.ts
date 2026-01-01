@@ -114,6 +114,28 @@ export interface AdminProfile {
 }
 
 // =============================================================================
+// Admin Debug Types
+// =============================================================================
+
+export interface AdminDebugSampleResponse {
+  jobId: number
+  reportId: number | null
+  taskIds: number[]
+  creatorEmail: string
+  reviewerEmail: string
+}
+
+export interface AdminDebugCompileResponse {
+  jobId: number
+  reportId: number
+  status: string
+}
+
+export interface AdminDebugRequeueResponse {
+  requeuedCount: number
+}
+
+// =============================================================================
 // Auth Request Types
 // =============================================================================
 
@@ -149,12 +171,14 @@ export interface SignUpRequest {
 export class ApiRequestError extends Error {
   public readonly code: string
   public readonly details?: Record<string, unknown>
+  public readonly status?: number
 
-  constructor(error: ApiError) {
+  constructor(error: ApiError, status?: number) {
     super(error.message)
     this.name = "ApiRequestError"
     this.code = error.code
     this.details = error.details
+    this.status = status
   }
 }
 

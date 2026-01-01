@@ -5,6 +5,7 @@ import { Clock, CheckCircle, AlertCircle, Play, TrendingUp, ChevronRight, Zap, A
 import { useCreatorJobs, getJobStatusLabel, getJobStatusHelperText } from "@/lib/hooks/use-creator"
 import type { JobDto, JobStatus } from "@/lib/types/api"
 import { Button } from "@/components/ui/button"
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
 import { trackEvent } from "@/lib/analytics"
 
@@ -127,8 +128,18 @@ export function ReviewStatusSection() {
           <h2 className="text-lg font-semibold text-card-foreground">Recent Submissions</h2>
         </div>
         <div className="divide-y divide-border">
-          {jobs.map((job) => (
-            <div key={job.id} className="p-4 hover:bg-secondary/50 transition-colors">
+          {jobs.length === 0 ? (
+            <div className="p-6">
+              <Empty>
+                <EmptyHeader>
+                  <EmptyTitle>No submissions yet</EmptyTitle>
+                  <EmptyDescription>Upload a video to get started.</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            </div>
+          ) : (
+            jobs.map((job) => (
+              <div key={job.id} className="p-4 hover:bg-secondary/50 transition-colors">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-4 flex-1">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary flex-shrink-0">
@@ -254,8 +265,9 @@ export function ReviewStatusSection() {
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
