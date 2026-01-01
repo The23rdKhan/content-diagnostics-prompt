@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -10,41 +10,45 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { useAdminCapacity } from "@/lib/hooks/use-admin"
+import { useAdminCapacity, useUpdateCapacity } from "@/lib/hooks/use-admin"
 import type { LanguagePoolCapacity } from "@/lib/types/api"
 import { trackEvent } from "@/lib/analytics"
-import { Settings, AlertTriangle, CheckCircle2, RefreshCw, AlertCircle } from "lucide-react"
+import { Settings, AlertTriangle, CheckCircle2, RefreshCw, AlertCircle, Loader2 } from "lucide-react"
 
 export default function CapacityPage() {
   const { capacity, loading, error, refetch } = useAdminCapacity()
-  const [localPools, setLocalPools] = useState<LanguagePoolCapacity[]>([])
+  const { updateCapacity, loading: saving, error: saveError } = useUpdateCapacity()
   const [editingPool, setEditingPool] = useState<LanguagePoolCapacity | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  // Sync API data to local state
-  useEffect(() => {
-    if (capacity?.languagePools) {
-      setLocalPools(capacity.languagePools)
-    }
-  }, [capacity])
+  const pools = capacity?.languagePools ?? []
 
   const handleEditPool = (pool: LanguagePoolCapacity) => {
     setEditingPool({ ...pool })
     setSheetOpen(true)
   }
 
-  const handleSavePool = () => {
+  const handleSavePool = async () => {
     if (!editingPool) return
 
-    setLocalPools(localPools.map((p) => (p.id === editingPool.id ? editingPool : p)))
-    trackEvent("admin_capacity_changed", {
-      poolId: editingPool.id,
-      sla: editingPool.currentSLA,
-      maxReviewers: editingPool.maxReviewersPerVideo,
-      checkoutEnabled: editingPool.checkoutEnabled,
-    })
-    setSheetOpen(false)
-    // In a real implementation, this would call an API to persist the changes
+    try {
+      await updateCapacity(editingPool.id, {
+        currentSLA: editingPool.currentSLA,
+        maxReviewersPerVideo: editingPool.maxReviewersPerVideo,
+        checkoutEnabled: editingPool.checkoutEnabled,
+        liveAddOnEnabled: editingPool.liveAddOnEnabled,
+      })
+      trackEvent("admin_capacity_changed", {
+        poolId: editingPool.id,
+        sla: editingPool.currentSLA,
+        maxReviewers: editingPool.maxReviewersPerVideo,
+        checkoutEnabled: editingPool.checkoutEnabled,
+      })
+      setSheetOpen(false)
+      refetch()
+    } catch (err) {
+      console.error("Failed to save capacity:", err)
+    }
   }
 
   const getCapacityBadge = (score: number) => {
@@ -122,14 +126,14 @@ export default function CapacityPage() {
                       <td className="py-3 px-4"><Skeleton className="h-8 w-8" /></td>
                     </tr>
                   ))
-                ) : localPools.length === 0 ? (
+                ) : pools.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="py-8 text-center text-muted-foreground">
                       No language pools configured
                     </td>
                   </tr>
                 ) : (
-                  localPools.map((pool) => {
+                  pools.map((pool) => {
                     const capacityBadge = getCapacityBadge(pool.capacityScore)
                     return (
                       <tr key={pool.id} className="border-b border-border hover:bg-accent/10">
@@ -277,11 +281,24 @@ export default function CapacityPage() {
                 </div>
               </div>
 
+              {saveError && (
+                <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3">
+                  <p className="text-sm text-destructive">{saveError.message}</p>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-4">
-                <Button onClick={handleSavePool} className="flex-1">
-                  Save Changes
+                <Button onClick={handleSavePool} className="flex-1" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
                 </Button>
-                <Button variant="outline" onClick={() => setSheetOpen(false)}>
+                <Button variant="outline" onClick={() => setSheetOpen(false)} disabled={saving}>
                   Cancel
                 </Button>
               </div>

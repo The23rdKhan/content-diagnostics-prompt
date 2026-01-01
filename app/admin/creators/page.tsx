@@ -1,26 +1,44 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { creators as initialCreators } from "@/lib/admin-data"
-import type { Creator } from "@/lib/admin-data"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { useAdminCreators, useAdminCreatorStats, useGrantCredit, type AdminCreatorDto } from "@/lib/hooks/use-admin"
 import { trackEvent } from "@/lib/analytics"
-import { Search, ExternalLink, DollarSign } from "lucide-react"
+import { Search, ExternalLink, DollarSign, AlertCircle, RefreshCw, Loader2 } from "lucide-react"
 
 export default function CreatorsPage() {
-  const [creators, setCreators] = useState(initialCreators)
   const [searchQuery, setSearchQuery] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const { creators, loading, error, refetch } = useAdminCreators(debouncedSearch || undefined)
+  const { stats, loading: statsLoading } = useAdminCreatorStats()
+  const { grantCredit, loading: granting, error: grantError } = useGrantCredit()
 
-  const filteredCreators = creators.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  const [creditDialogOpen, setCreditDialogOpen] = useState(false)
+  const [selectedCreator, setSelectedCreator] = useState<AdminCreatorDto | null>(null)
+  const [creditAmount, setCreditAmount] = useState(100)
+  const [creditReason, setCreditReason] = useState("")
 
-  const getPlanBadge = (tier: Creator["planTier"]) => {
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const getPlanBadge = (tier: AdminCreatorDto["planTier"]) => {
     const badges = {
       basic: { label: "Basic", variant: "secondary" as const },
       professional: { label: "Professional", variant: "default" as const },
@@ -29,9 +47,46 @@ export default function CreatorsPage() {
     return badges[tier]
   }
 
-  const handleGrantCredit = (creatorId: string) => {
-    trackEvent("admin_credit_granted", { creatorId, amount: 100 })
-    alert(`Credit granted to creator ${creatorId}`)
+  const handleOpenCreditDialog = (creator: AdminCreatorDto) => {
+    setSelectedCreator(creator)
+    setCreditAmount(100)
+    setCreditReason("")
+    setCreditDialogOpen(true)
+  }
+
+  const handleGrantCredit = async () => {
+    if (!selectedCreator) return
+
+    try {
+      await grantCredit(selectedCreator.id, creditAmount, creditReason || undefined)
+      trackEvent("admin_credit_granted", {
+        creatorId: selectedCreator.id,
+        amount: creditAmount,
+      })
+      setCreditDialogOpen(false)
+      refetch()
+    } catch (err) {
+      console.error("Failed to grant credit:", err)
+    }
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <p>Failed to load creators. {error.message}</p>
+            </div>
+            <Button variant="outline" className="mt-4" onClick={refetch}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -48,7 +103,11 @@ export default function CreatorsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Creators</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">342</div>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">{stats?.totalCreators ?? 0}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -56,7 +115,11 @@ export default function CreatorsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Active This Month</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">217</div>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">{stats?.activeThisMonth ?? 0}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -64,7 +127,13 @@ export default function CreatorsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Uploads</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">1,847</div>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">
+                {stats?.totalUploads?.toLocaleString() ?? 0}
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -72,7 +141,13 @@ export default function CreatorsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Credits Issued</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">$2,340</div>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold text-foreground">
+                ${stats?.creditsIssued?.toLocaleString() ?? 0}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -108,53 +183,146 @@ export default function CreatorsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredCreators.map((creator) => {
-                  const planBadge = getPlanBadge(creator.planTier)
-                  return (
-                    <tr key={creator.id} className="border-b border-border hover:bg-accent/10">
+                {loading ? (
+                  [...Array(3)].map((_, i) => (
+                    <tr key={i} className="border-b border-border">
                       <td className="py-3 px-4">
-                        <div className="font-medium text-foreground">{creator.name}</div>
-                        <div className="text-sm text-muted-foreground">{creator.email}</div>
+                        <Skeleton className="h-5 w-32 mb-1" />
+                        <Skeleton className="h-4 w-40" />
                       </td>
-                      <td className="py-3 px-4">
-                        <Badge variant={planBadge.variant}>{planBadge.label}</Badge>
-                      </td>
-                      <td className="py-3 px-4 text-foreground">{creator.uploadsThisMonth}</td>
-                      <td className="py-3 px-4">
-                        {creator.slaIssues > 0 ? (
-                          <Badge variant="destructive">{creator.slaIssues}</Badge>
-                        ) : (
-                          <span className="text-muted-foreground">0</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        {creator.creditsIssued > 0 ? (
-                          <span className="text-foreground">${creator.creditsIssued}</span>
-                        ) : (
-                          <span className="text-muted-foreground">$0</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">
-                        {new Date(creator.joinedAt).toLocaleDateString()}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleGrantCredit(creator.id)}>
-                            <DollarSign className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
+                      <td className="py-3 px-4"><Skeleton className="h-6 w-20" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-10" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-6 w-8" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-12" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-24" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-8 w-16" /></td>
                     </tr>
-                  )
-                })}
+                  ))
+                ) : creators.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      {searchQuery ? "No creators found matching your search" : "No creators found"}
+                    </td>
+                  </tr>
+                ) : (
+                  creators.map((creator) => {
+                    const planBadge = getPlanBadge(creator.planTier)
+                    return (
+                      <tr key={creator.id} className="border-b border-border hover:bg-accent/10">
+                        <td className="py-3 px-4">
+                          <div className="font-medium text-foreground">{creator.name}</div>
+                          <div className="text-sm text-muted-foreground">{creator.email}</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge variant={planBadge.variant}>{planBadge.label}</Badge>
+                        </td>
+                        <td className="py-3 px-4 text-foreground">{creator.uploadsThisMonth}</td>
+                        <td className="py-3 px-4">
+                          {creator.slaIssues > 0 ? (
+                            <Badge variant="destructive">{creator.slaIssues}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          {creator.creditsIssued > 0 ? (
+                            <span className="text-foreground">${creator.creditsIssued}</span>
+                          ) : (
+                            <span className="text-muted-foreground">$0</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-muted-foreground">
+                          {new Date(creator.joinedAt).toLocaleDateString()}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenCreditDialog(creator)}
+                              title="Grant Credit"
+                            >
+                              <DollarSign className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" title="View Details">
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
+
+      {/* Grant Credit Dialog */}
+      <Dialog open={creditDialogOpen} onOpenChange={setCreditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Grant Credit</DialogTitle>
+            <DialogDescription>
+              Issue a credit to {selectedCreator?.name} ({selectedCreator?.email})
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Credit Amount</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">$</span>
+                <Input
+                  id="amount"
+                  type="number"
+                  value={creditAmount}
+                  onChange={(e) => setCreditAmount(Number.parseInt(e.target.value) || 0)}
+                  min={1}
+                  max={10000}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reason">Reason (optional)</Label>
+              <Textarea
+                id="reason"
+                value={creditReason}
+                onChange={(e) => setCreditReason(e.target.value)}
+                placeholder="e.g., SLA miss compensation, goodwill credit..."
+                rows={3}
+              />
+            </div>
+
+            {grantError && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3">
+                <p className="text-sm text-destructive">{grantError.message}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreditDialogOpen(false)} disabled={granting}>
+              Cancel
+            </Button>
+            <Button onClick={handleGrantCredit} disabled={granting || creditAmount <= 0}>
+              {granting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Granting...
+                </>
+              ) : (
+                <>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Grant ${creditAmount}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

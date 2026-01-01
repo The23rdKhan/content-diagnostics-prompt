@@ -1,40 +1,43 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { tasks as initialTasks } from "@/lib/admin-data"
-import type { Task } from "@/lib/admin-data"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useAdminTasks, useBulkTaskAction, type AdminTaskDto, type BulkTaskAction } from "@/lib/hooks/use-admin"
 import { trackEvent } from "@/lib/analytics"
-import { CheckCircle2, XCircle, RefreshCw, DollarSign, Pause } from "lucide-react"
+import { CheckCircle2, XCircle, RefreshCw, DollarSign, Pause, AlertCircle, Loader2 } from "lucide-react"
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState(initialTasks)
   const [filterStatus, setFilterStatus] = useState<string>("all")
-  const [selectedTasks, setSelectedTasks] = useState<string[]>([])
+  const { tasks, loading, error, refetch } = useAdminTasks(filterStatus)
+  const { executeBulkAction, loading: bulkLoading, error: bulkError } = useBulkTaskAction()
+  const [selectedTasks, setSelectedTasks] = useState<number[]>([])
 
-  const filteredTasks = tasks.filter((task) => filterStatus === "all" || task.status === filterStatus)
+  // Clear selection when filter changes
+  useEffect(() => {
+    setSelectedTasks([])
+  }, [filterStatus])
 
-  const handleBulkAction = (action: string) => {
-    console.log("[v0] Bulk action:", action, selectedTasks)
+  const handleBulkAction = async (action: BulkTaskAction) => {
+    if (selectedTasks.length === 0) return
+
     trackEvent(`admin_task_${action}`, { taskCount: selectedTasks.length })
 
-    if (action === "approve") {
-      setTasks(tasks.map((t) => (selectedTasks.includes(t.id) ? { ...t, status: "approved" as const } : t)))
-    } else if (action === "reject") {
-      setTasks(tasks.map((t) => (selectedTasks.includes(t.id) ? { ...t, status: "rejected" as const } : t)))
-    } else if (action === "requeue") {
-      setTasks(tasks.map((t) => (selectedTasks.includes(t.id) ? { ...t, status: "requeued" as const } : t)))
+    try {
+      await executeBulkAction(selectedTasks, action)
+      setSelectedTasks([])
+      refetch()
+    } catch (err) {
+      console.error("Bulk action failed:", err)
     }
-
-    setSelectedTasks([])
   }
 
-  const getStatusBadge = (status: Task["status"]) => {
+  const getStatusBadge = (status: AdminTaskDto["status"]) => {
     const badges = {
       pending: { label: "Pending", variant: "secondary" as const },
       leased: { label: "Leased", variant: "default" as const },
@@ -44,6 +47,25 @@ export default function TasksPage() {
       requeued: { label: "Requeued", variant: "secondary" as const },
     }
     return badges[status]
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <Card className="border-destructive">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-5 w-5" />
+              <p>Failed to load tasks. {error.message}</p>
+            </div>
+            <Button variant="outline" className="mt-4" onClick={refetch}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -114,23 +136,23 @@ export default function TasksPage() {
 
             {selectedTasks.length > 0 && (
               <div className="flex items-end gap-2">
-                <Button variant="outline" size="sm" onClick={() => handleBulkAction("approve")}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction("approve")} disabled={bulkLoading}>
+                  {bulkLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
                   Approve ({selectedTasks.length})
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleBulkAction("reject")}>
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction("reject")} disabled={bulkLoading}>
                   <XCircle className="mr-2 h-4 w-4" />
                   Reject ({selectedTasks.length})
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleBulkAction("requeue")}>
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction("requeue")} disabled={bulkLoading}>
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Requeue ({selectedTasks.length})
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleBulkAction("increase_pay")}>
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction("increase_pay")} disabled={bulkLoading}>
                   <DollarSign className="mr-2 h-4 w-4" />
                   Increase Pay
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleBulkAction("pause")}>
+                <Button variant="outline" size="sm" onClick={() => handleBulkAction("pause")} disabled={bulkLoading}>
                   <Pause className="mr-2 h-4 w-4" />
                   Pause
                 </Button>
@@ -138,19 +160,21 @@ export default function TasksPage() {
             )}
           </div>
 
+          {bulkError && (
+            <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3">
+              <p className="text-sm text-destructive">{bulkError.message}</p>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-4">
                     <Checkbox
-                      checked={selectedTasks.length === filteredTasks.length && filteredTasks.length > 0}
+                      checked={selectedTasks.length === tasks.length && tasks.length > 0}
                       onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedTasks(filteredTasks.map((t) => t.id))
-                        } else {
-                          setSelectedTasks([])
-                        }
+                        setSelectedTasks(checked ? tasks.map((t) => t.id) : [])
                       }}
                     />
                   </th>
@@ -165,37 +189,58 @@ export default function TasksPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTasks.map((task) => {
-                  const statusBadge = getStatusBadge(task.status)
-                  return (
-                    <tr key={task.id} className="border-b border-border hover:bg-accent/10">
-                      <td className="py-3 px-4">
-                        <Checkbox
-                          checked={selectedTasks.includes(task.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedTasks([...selectedTasks, task.id])
-                            } else {
-                              setSelectedTasks(selectedTasks.filter((id) => id !== task.id))
-                            }
-                          }}
-                        />
-                      </td>
-                      <td className="py-3 px-4 font-mono text-sm text-foreground">{task.id}</td>
-                      <td className="py-3 px-4 font-mono text-sm text-foreground">{task.videoId}</td>
-                      <td className="py-3 px-4 text-sm text-foreground">{task.segmentTimestamp}</td>
-                      <td className="py-3 px-4 text-sm text-foreground">{task.language}</td>
-                      <td className="py-3 px-4 text-foreground font-semibold">${task.pay}</td>
-                      <td className="py-3 px-4">
-                        <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
-                      </td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">{task.reviewerId || "Unassigned"}</td>
-                      <td className="py-3 px-4 text-sm text-muted-foreground">
-                        {new Date(task.createdAt).toLocaleString()}
-                      </td>
+                {loading ? (
+                  [...Array(5)].map((_, i) => (
+                    <tr key={i} className="border-b border-border">
+                      <td className="py-3 px-4"><Skeleton className="h-4 w-4" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-20" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-24" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-20" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-24" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-12" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-6 w-20" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-20" /></td>
+                      <td className="py-3 px-4"><Skeleton className="h-5 w-32" /></td>
                     </tr>
-                  )
-                })}
+                  ))
+                ) : tasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                      No tasks found
+                    </td>
+                  </tr>
+                ) : (
+                  tasks.map((task) => {
+                    const statusBadge = getStatusBadge(task.status)
+                    return (
+                      <tr key={task.id} className="border-b border-border hover:bg-accent/10">
+                        <td className="py-3 px-4">
+                          <Checkbox
+                            checked={selectedTasks.includes(task.id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedTasks(checked
+                                ? [...selectedTasks, task.id]
+                                : selectedTasks.filter((id) => id !== task.id)
+                              )
+                            }}
+                          />
+                        </td>
+                        <td className="py-3 px-4 font-mono text-sm text-foreground">task-{task.id}</td>
+                        <td className="py-3 px-4 font-mono text-sm text-foreground">{task.videoId}</td>
+                        <td className="py-3 px-4 text-sm text-foreground">{task.segmentTimestamp}</td>
+                        <td className="py-3 px-4 text-sm text-foreground">{task.language}</td>
+                        <td className="py-3 px-4 text-foreground font-semibold">${task.pay}</td>
+                        <td className="py-3 px-4">
+                          <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+                        </td>
+                        <td className="py-3 px-4 text-sm text-muted-foreground">{task.reviewerId || "Unassigned"}</td>
+                        <td className="py-3 px-4 text-sm text-muted-foreground">
+                          {new Date(task.createdAt).toLocaleString()}
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
