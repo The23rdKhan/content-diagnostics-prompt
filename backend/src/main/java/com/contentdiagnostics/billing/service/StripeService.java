@@ -17,7 +17,6 @@ import com.stripe.model.*;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.param.CustomerCreateParams;
-import com.stripe.param.billingportal.SessionCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
@@ -125,7 +124,8 @@ public class StripeService {
         try {
             String url = returnUrl != null ? returnUrl : "http://localhost:3000/creators/subscription";
 
-            SessionCreateParams params = SessionCreateParams.builder()
+            com.stripe.param.billingportal.SessionCreateParams params =
+                    com.stripe.param.billingportal.SessionCreateParams.builder()
                     .setCustomer(profile.getStripeCustomerId())
                     .setReturnUrl(url)
                     .build();
