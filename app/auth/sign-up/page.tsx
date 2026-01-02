@@ -25,6 +25,7 @@ export default function SignUpPage() {
   const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
 
   // Contact & location
   const [phoneNumber, setPhoneNumber] = useState("")
@@ -46,6 +47,14 @@ export default function SignUpPage() {
     // Validation
     if (!firstName || !lastName || !email || !password) {
       setError("Please fill in all required fields")
+      return
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
+      return
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters")
       return
     }
     if (!country) {
@@ -228,6 +237,19 @@ export default function SignUpPage() {
                 placeholder="Min 8 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="confirmPassword">Confirm Password *</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="Re-enter your password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={loading}
                 className="mt-1"
               />
