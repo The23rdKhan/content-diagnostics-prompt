@@ -14,6 +14,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { NotificationBell } from "@/components/notification-bell"
 import { ProfileDropdown } from "@/components/profile-dropdown"
 import { useAuth } from "@/lib/auth-context"
+import { LoadingScreen } from "@/components/loading-screen"
 
 type ActiveSection = "queue" | "history" | "earnings" | "payout" | "language" | "support"
 
@@ -33,14 +34,7 @@ export function ReviewerDashboard() {
 
   // Show loading state while auth is bootstrapping
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent mx-auto" />
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   // Format earnings for display

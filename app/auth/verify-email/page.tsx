@@ -38,17 +38,20 @@ function VerifyEmailContent() {
         if (err instanceof ApiRequestError) {
           if (err.code === "INVALID_TOKEN" || err.code === "TOKEN_EXPIRED") {
             setError("This verification link has expired or is invalid.")
+            setState("error")
           } else if (err.code === "EMAIL_ALREADY_VERIFIED") {
             setState("success") // Already verified is still success
           } else if (err.status === 404) {
             setError("Email verification is not available yet. Please contact support.")
+            setState("error")
           } else {
             setError(err.message || "Verification failed. Please try again.")
+            setState("error")
           }
         } else {
           setError("Unable to connect to server. Please try again.")
+          setState("error")
         }
-        setState("error")
       }
     }
 

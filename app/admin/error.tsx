@@ -14,6 +14,8 @@ export default function AdminError({
   reset: () => void
 }) {
   useEffect(() => {
+    // TODO: Integrate production error tracking (e.g., Sentry, LogRocket)
+    // Example: Sentry.captureException(error, { tags: { section: 'admin' } })
     console.error("Admin section error:", error)
   }, [error])
 

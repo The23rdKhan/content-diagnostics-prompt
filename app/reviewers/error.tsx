@@ -14,6 +14,8 @@ export default function ReviewerError({
   reset: () => void
 }) {
   useEffect(() => {
+    // TODO: Integrate production error tracking (e.g., Sentry, LogRocket)
+    // Example: Sentry.captureException(error, { tags: { section: 'reviewer' } })
     console.error("Reviewer section error:", error)
   }, [error])
 

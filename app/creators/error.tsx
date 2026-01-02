@@ -14,6 +14,8 @@ export default function CreatorError({
   reset: () => void
 }) {
   useEffect(() => {
+    // TODO: Integrate production error tracking (e.g., Sentry, LogRocket)
+    // Example: Sentry.captureException(error, { tags: { section: 'creator' } })
     console.error("Creator section error:", error)
   }, [error])
 

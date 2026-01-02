@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { trackEvent } from "@/lib/analytics"
 import { ArrowRight, Lock } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { LoadingScreen } from "@/components/loading-screen"
 
 export default function ReviewerLanguage() {
   const [proficiency, setProficiency] = useState<"native" | "fluent" | "intermediate">("fluent")
@@ -32,14 +33,7 @@ export default function ReviewerLanguage() {
 
   // Don't render until we've verified the prerequisite step was completed
   if (!isReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent mx-auto" />
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   const handleContinue = () => {

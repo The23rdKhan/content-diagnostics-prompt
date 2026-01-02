@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { AlertCircle, ArrowLeft, CreditCard, Building, Check, CheckCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { DemoModeBanner } from "@/components/demo-mode-banner"
 
 export default function ReviewerBilling() {
   const [payoutMethod, setPayoutMethod] = useState<"paypal" | "bank">("paypal")
@@ -58,18 +59,7 @@ export default function ReviewerBilling() {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        {/* Demo Mode Banner */}
-        <div className="mb-6 rounded-lg border-2 border-dashed border-amber-500/50 bg-amber-500/10 p-4">
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-white text-xs font-bold">!</span>
-            <div>
-              <p className="font-semibold text-amber-700 dark:text-amber-400">Demo Mode</p>
-              <p className="text-sm text-amber-600 dark:text-amber-500">
-                This is a preview of the payout interface. No real payouts will be processed.
-              </p>
-            </div>
-          </div>
-        </div>
+        <DemoModeBanner message="This is a preview of the payout interface. No real payouts will be processed." />
 
         <h1 className="text-3xl font-bold text-foreground mb-2">Payout & Billing</h1>
         <p className="text-muted-foreground mb-8">Manage your payout method and view payment history.</p>

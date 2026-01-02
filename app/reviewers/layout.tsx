@@ -4,6 +4,7 @@ import type React from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
+import { LoadingScreen } from "@/components/loading-screen"
 
 export default function ReviewerLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, loading } = useAuth()
@@ -22,14 +23,7 @@ export default function ReviewerLayout({ children }: { children: React.ReactNode
   }, [isAuthenticated, user, router, loading])
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent mx-auto" />
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   if (!isAuthenticated || user?.role !== "REVIEWER") {

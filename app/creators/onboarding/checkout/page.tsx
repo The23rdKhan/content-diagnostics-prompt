@@ -12,6 +12,7 @@ import { trackEvent } from "@/lib/analytics"
 import { AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Lock } from "lucide-react"
+import { LoadingScreen } from "@/components/loading-screen"
 
 export default function CreatorCheckout() {
   const [cardNumber, setCardNumber] = useState("")
@@ -48,14 +49,7 @@ export default function CreatorCheckout() {
 
   // Don't render until we've verified the prerequisite step was completed
   if (!isReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent mx-auto" />
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   const handleCheckout = async () => {

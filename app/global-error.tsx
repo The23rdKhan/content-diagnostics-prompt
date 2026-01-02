@@ -10,6 +10,8 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
+    // TODO: Integrate production error tracking (e.g., Sentry, LogRocket)
+    // Example: Sentry.captureException(error, { tags: { section: 'global' } })
     console.error("Global error:", error)
   }, [error])
 

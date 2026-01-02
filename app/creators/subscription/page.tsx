@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowRight, Check, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 import { CREATOR_PLANS } from "@/components/creator/plan-selector"
+import { DemoModeBanner } from "@/components/demo-mode-banner"
 
 export default function CreatorSubscription() {
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false)
@@ -65,18 +66,7 @@ export default function CreatorSubscription() {
           Manage your current plan, upgrade, downgrade, or cancel anytime.
         </p>
 
-        {/* Demo Mode Banner */}
-        <div className="mb-6 rounded-lg border-2 border-dashed border-amber-500/50 bg-amber-500/10 p-4">
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-white text-xs font-bold">!</span>
-            <div>
-              <p className="font-semibold text-amber-700 dark:text-amber-400">Demo Mode</p>
-              <p className="text-sm text-amber-600 dark:text-amber-500">
-                This is a preview of the subscription interface. No real plan changes will be processed.
-              </p>
-            </div>
-          </div>
-        </div>
+        <DemoModeBanner message="This is a preview of the subscription interface. No real plan changes will be processed." />
 
         {/* Success/Error alerts */}
         {successMessage && (
