@@ -60,6 +60,27 @@ public class User implements UserDetails {
     @Column
     private Instant lastLoginAt;
 
+    // --- New signup fields ---
+
+    @Column(length = 20)
+    private String phoneNumber;
+
+    @Column(length = 2)
+    private String country; // ISO 3166-1 alpha-2
+
+    @Column(length = 50)
+    private String timezone; // IANA timezone ID
+
+    @Column
+    private Instant tosAcceptedAt;
+
+    @Column(length = 20)
+    private String tosVersion;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean marketingConsent = false;
+
     // --- UserDetails implementation ---
 
     @Override

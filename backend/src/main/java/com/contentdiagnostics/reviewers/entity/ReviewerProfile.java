@@ -32,7 +32,13 @@ public class ReviewerProfile {
     private User user;
 
     @Column(nullable = false, length = 100)
-    private String name;
+    private String name; // Legacy field, kept for backward compatibility
+
+    @Column(nullable = false, length = 50)
+    private String firstName;
+
+    @Column(nullable = false, length = 50)
+    private String lastName;
 
     @Column(length = 512)
     private String profileImageUrl;
@@ -95,6 +101,16 @@ public class ReviewerProfile {
     @UpdateTimestamp
     @Column(nullable = false)
     private Instant updatedAt;
+
+    /**
+     * Get the display name combining firstName and lastName.
+     */
+    public String getDisplayName() {
+        if (lastName == null || lastName.isEmpty()) {
+            return firstName;
+        }
+        return firstName + " " + lastName;
+    }
 
     /**
      * Check if reviewer can access the task queue.

@@ -18,7 +18,9 @@ import java.time.Instant;
 public class ReviewerProfileDto {
 
     private Long id;
-    private String name;
+    private String firstName;
+    private String lastName;
+    private String displayName;
     private String email;
     private String profileImageUrl;
     private String language;

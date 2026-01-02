@@ -24,6 +24,11 @@ public class UserProfileResponse {
     private String email;
     private UserRole role;
     private boolean emailVerified;
+    private String phoneNumber;
+    private String country;
+    private String timezone;
+    private Instant tosAcceptedAt;
+    private boolean marketingConsent;
     private Instant createdAt;
     private Instant lastLoginAt;
 
@@ -37,7 +42,9 @@ public class UserProfileResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class CreatorProfile {
-        private String name;
+        private String firstName;
+        private String lastName;
+        private String displayName;
         private String company;
         private String profileImageUrl;
         private String bannerImageUrl;
@@ -51,7 +58,9 @@ public class UserProfileResponse {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ReviewerProfile {
-        private String name;
+        private String firstName;
+        private String lastName;
+        private String displayName;
         private String profileImageUrl;
         private String language;
         private String proficiency;

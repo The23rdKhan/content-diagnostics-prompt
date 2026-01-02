@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -51,14 +51,20 @@ export default function SignInPage() {
   }
 
   // Redirect after successful sign-in based on role
+  useEffect(() => {
+    if (user) {
+      const redirectPath =
+        user.role === "ADMIN"
+          ? "/admin/dashboard"
+          : user.role === "REVIEWER"
+            ? "/reviewers/dashboard"
+            : "/creators/dashboard"
+      router.push(redirectPath)
+    }
+  }, [user, router])
+
+  // Show nothing while redirecting
   if (user) {
-    const redirectPath =
-      user.role === "ADMIN"
-        ? "/admin/dashboard"
-        : user.role === "REVIEWER"
-          ? "/reviewers/dashboard"
-          : "/creators/dashboard"
-    router.push(redirectPath)
     return null
   }
 

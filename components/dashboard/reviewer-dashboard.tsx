@@ -12,6 +12,8 @@ import { LanguageSection } from "./reviewer/language-section"
 import { ReviewerSupportSection } from "./reviewer/reviewer-support-section"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { NotificationBell } from "@/components/notification-bell"
+import { ProfileDropdown } from "@/components/profile-dropdown"
+import { useAuth } from "@/lib/auth-context"
 
 type ActiveSection = "queue" | "history" | "earnings" | "payout" | "language" | "support"
 
@@ -27,6 +29,13 @@ const navItems = [
 export function ReviewerDashboard() {
   const [activeSection, setActiveSection] = useState<ActiveSection>("queue")
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { user } = useAuth()
+
+  // Format earnings for display
+  const getEarningsDisplay = () => {
+    const earnings = user?.reviewerProfile?.totalEarnings ?? 0
+    return `$${earnings.toFixed(2)} earned`
+  }
 
   const renderSection = () => {
     switch (activeSection) {
@@ -64,7 +73,7 @@ export function ReviewerDashboard() {
         }`}
       >
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/reviewers/dashboard" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
               <span className="text-sm font-bold text-accent-foreground">CD</span>
             </div>
@@ -97,9 +106,9 @@ export function ReviewerDashboard() {
 
         <div className="absolute bottom-0 left-0 right-0 border-t border-border p-4">
           <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground" asChild>
-            <Link href="/">
+            <Link href="/reviewers/dashboard">
               <LogOut className="h-4 w-4" />
-              Back to Home
+              Dashboard Home
             </Link>
           </Button>
         </div>
@@ -118,12 +127,7 @@ export function ReviewerDashboard() {
           <div className="flex items-center gap-4">
             <NotificationBell />
             <ThemeToggle />
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-accent font-medium">$42.30 earned</span>
-              <div className="h-8 w-8 rounded-full bg-accent/20 flex items-center justify-center">
-                <span className="text-sm font-medium text-accent">AR</span>
-              </div>
-            </div>
+            <ProfileDropdown subtitle={getEarningsDisplay()} />
           </div>
         </header>
 

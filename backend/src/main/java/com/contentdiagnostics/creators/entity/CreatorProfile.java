@@ -29,7 +29,13 @@ public class CreatorProfile {
     private User user;
 
     @Column(nullable = false, length = 100)
-    private String name;
+    private String name; // Legacy field, kept for backward compatibility
+
+    @Column(nullable = false, length = 50)
+    private String firstName;
+
+    @Column(nullable = false, length = 50)
+    private String lastName;
 
     @Column(length = 100)
     private String company;
@@ -65,4 +71,14 @@ public class CreatorProfile {
     @UpdateTimestamp
     @Column(nullable = false)
     private Instant updatedAt;
+
+    /**
+     * Get the display name combining firstName and lastName.
+     */
+    public String getDisplayName() {
+        if (lastName == null || lastName.isEmpty()) {
+            return firstName;
+        }
+        return firstName + " " + lastName;
+    }
 }

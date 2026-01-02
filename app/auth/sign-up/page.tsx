@@ -6,30 +6,83 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { useAuth, type UserRole, ApiRequestError } from "@/lib/auth-context"
 import { trackEvent } from "@/lib/analytics"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { COUNTRIES } from "@/lib/constants/countries"
+import { TIMEZONES, getDetectedTimezone } from "@/lib/constants/timezones"
+import { PAYOUT_METHODS } from "@/lib/constants/payout-methods"
 
 export default function SignUpPage() {
   const [roleSelection, setRoleSelection] = useState<UserRole | null>(null)
+
+  // Personal info
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [name, setName] = useState("")
+
+  // Contact & location
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [country, setCountry] = useState("")
+  const [timezone, setTimezone] = useState(getDetectedTimezone())
+
+  // Reviewer-specific
+  const [payoutMethod, setPayoutMethod] = useState("")
+
+  // Legal
+  const [tosAccepted, setTosAccepted] = useState(false)
+  const [marketingConsent, setMarketingConsent] = useState(false)
+
   const [error, setError] = useState("")
   const { signUp, loading } = useAuth()
   const router = useRouter()
 
   const handleSignUp = async () => {
-    if (!roleSelection || !email || !password || !name) {
-      setError("Please fill in all fields")
+    // Validation
+    if (!firstName || !lastName || !email || !password) {
+      setError("Please fill in all required fields")
+      return
+    }
+    if (!country) {
+      setError("Please select your country")
+      return
+    }
+    if (!timezone) {
+      setError("Please select your timezone")
+      return
+    }
+    if (!tosAccepted) {
+      setError("You must accept the Terms of Service to continue")
+      return
+    }
+    if (roleSelection === "REVIEWER" && !payoutMethod) {
+      setError("Please select your preferred payout method")
       return
     }
 
     try {
-      trackEvent(`${roleSelection.toLowerCase()}_signup_started`)
-      await signUp(email, password, roleSelection, name)
-      trackEvent(`${roleSelection.toLowerCase()}_signup_completed`)
+      trackEvent(`${roleSelection?.toLowerCase()}_signup_started`)
+      await signUp({
+        email,
+        password,
+        role: roleSelection!,
+        firstName,
+        lastName,
+        phoneNumber: phoneNumber || undefined,
+        country,
+        timezone,
+        tosAccepted,
+        marketingConsent,
+        preferredPayoutMethod: roleSelection === "REVIEWER"
+          ? payoutMethod as 'PAYPAL' | 'BANK_TRANSFER' | 'STRIPE_CONNECT'
+          : undefined,
+      })
+      trackEvent(`${roleSelection?.toLowerCase()}_signup_completed`)
 
       // Redirect based on role
       if (roleSelection === "CREATOR") {
@@ -76,7 +129,7 @@ export default function SignUpPage() {
               onClick={() => setRoleSelection("CREATOR")}
               className="w-full p-4 border border-border rounded-lg hover:bg-secondary transition-colors text-left"
             >
-              <h3 className="font-semibold text-foreground mb-1">I'm a Creator</h3>
+              <h3 className="font-semibold text-foreground mb-1">I&apos;m a Creator</h3>
               <p className="text-sm text-muted-foreground">I want feedback on my content before publishing</p>
             </button>
 
@@ -84,7 +137,7 @@ export default function SignUpPage() {
               onClick={() => setRoleSelection("REVIEWER")}
               className="w-full p-4 border border-border rounded-lg hover:bg-secondary transition-colors text-left"
             >
-              <h3 className="font-semibold text-foreground mb-1">I'm a Reviewer</h3>
+              <h3 className="font-semibold text-foreground mb-1">I&apos;m a Reviewer</h3>
               <p className="text-sm text-muted-foreground">I want to get paid reviewing content</p>
             </button>
 
@@ -106,7 +159,7 @@ export default function SignUpPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <Button variant="ghost" className="w-fit mx-auto mb-4" onClick={() => setRoleSelection(null)}>
-            ← Back
+            &larr; Back
           </Button>
           <CardTitle className="text-2xl">
             {roleSelection === "CREATOR" ? "Create Creator Account" : "Create Reviewer Account"}
@@ -117,7 +170,7 @@ export default function SignUpPage() {
               : "Join our reviewer network and earn money"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -125,39 +178,171 @@ export default function SignUpPage() {
             </Alert>
           )}
 
-          <div>
-            <label className="text-sm font-medium">Full Name</label>
-            <Input
-              placeholder="John Doe"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={loading}
-              className="mt-1"
-            />
+          {/* Personal Information */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-muted-foreground">Personal Information</h3>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="firstName">First Name *</Label>
+                <Input
+                  id="firstName"
+                  placeholder="John"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  disabled={loading}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="lastName">Last Name *</Label>
+                <Input
+                  id="lastName"
+                  placeholder="Doe"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  disabled={loading}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="email">Email *</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="password">Password *</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Min 8 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                className="mt-1"
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium">Email</label>
-            <Input
-              type="email"
-              placeholder="john@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-              className="mt-1"
-            />
+          {/* Contact & Location */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium text-muted-foreground">Contact & Location</h3>
+
+            <div>
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+1 (555) 123-4567"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                disabled={loading}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="country">Country *</Label>
+              <Select value={country} onValueChange={setCountry} disabled={loading}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select your country" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="timezone">Timezone *</Label>
+              <Select value={timezone} onValueChange={setTimezone} disabled={loading}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select your timezone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIMEZONES.map((tz) => (
+                    <SelectItem key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium">Password</label>
-            <Input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              className="mt-1"
-            />
+          {/* Reviewer-only: Payout Preferences */}
+          {roleSelection === "REVIEWER" && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-medium text-muted-foreground">Payout Preferences</h3>
+
+              <div>
+                <Label htmlFor="payoutMethod">Preferred Payout Method *</Label>
+                <Select value={payoutMethod} onValueChange={setPayoutMethod} disabled={loading}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="How would you like to be paid?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYOUT_METHODS.map((pm) => (
+                      <SelectItem key={pm.value} value={pm.value}>
+                        <div>
+                          <div>{pm.label}</div>
+                          <div className="text-xs text-muted-foreground">{pm.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* Legal */}
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="tos"
+                checked={tosAccepted}
+                onCheckedChange={(checked) => setTosAccepted(checked === true)}
+                disabled={loading}
+              />
+              <Label htmlFor="tos" className="text-sm leading-relaxed cursor-pointer">
+                I accept the{" "}
+                <Link href="/legal/terms" className="text-accent hover:underline" target="_blank">
+                  Terms of Service
+                </Link>{" "}
+                and{" "}
+                <Link href="/legal/privacy" className="text-accent hover:underline" target="_blank">
+                  Privacy Policy
+                </Link>{" "}
+                *
+              </Label>
+            </div>
+
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="marketing"
+                checked={marketingConsent}
+                onCheckedChange={(checked) => setMarketingConsent(checked === true)}
+                disabled={loading}
+              />
+              <Label htmlFor="marketing" className="text-sm leading-relaxed cursor-pointer">
+                I agree to receive marketing emails and product updates
+              </Label>
+            </div>
           </div>
 
           <Button onClick={handleSignUp} disabled={loading} className="w-full">

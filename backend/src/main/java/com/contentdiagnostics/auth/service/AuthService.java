@@ -60,11 +60,17 @@ public class AuthService {
             throw new BadRequestException("Admin accounts cannot be self-registered", "INVALID_ROLE");
         }
 
-        // Create user
+        // Create user with new signup fields
         User user = User.builder()
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole())
+                .phoneNumber(request.getPhoneNumber())
+                .country(request.getCountry())
+                .timezone(request.getTimezone())
+                .tosAcceptedAt(request.isTosAccepted() ? Instant.now() : null)
+                .tosVersion("1.0")
+                .marketingConsent(request.isMarketingConsent())
                 .enabled(true)
                 .emailVerified(false)
                 .build();
@@ -141,6 +147,11 @@ public class AuthService {
                 .email(user.getEmail())
                 .role(user.getRole())
                 .emailVerified(user.isEmailVerified())
+                .phoneNumber(user.getPhoneNumber())
+                .country(user.getCountry())
+                .timezone(user.getTimezone())
+                .tosAcceptedAt(user.getTosAcceptedAt())
+                .marketingConsent(user.isMarketingConsent())
                 .createdAt(user.getCreatedAt())
                 .lastLoginAt(user.getLastLoginAt());
 
@@ -201,7 +212,9 @@ public class AuthService {
             case CREATOR -> {
                 CreatorProfile profile = CreatorProfile.builder()
                         .user(user)
-                        .name(request.getName())
+                        .firstName(request.getFirstName())
+                        .lastName(request.getLastName())
+                        .name(request.getName()) // Legacy field for backward compatibility
                         .company(request.getCompany())
                         .primaryLanguage("English") // MVP: English-only
                         .planTier("basic")
@@ -212,9 +225,12 @@ public class AuthService {
             case REVIEWER -> {
                 ReviewerProfile profile = ReviewerProfile.builder()
                         .user(user)
-                        .name(request.getName())
+                        .firstName(request.getFirstName())
+                        .lastName(request.getLastName())
+                        .name(request.getName()) // Legacy field for backward compatibility
                         .language("English") // MVP: English-only
                         .proficiency(request.getProficiency() != null ? request.getProficiency() : "native")
+                        .payoutMethod(request.getPreferredPayoutMethod())
                         .qualificationPassed(false)
                         .qualityScore(initialQualityScore)
                         .queueLocked(true) // Locked until qualification passed
@@ -233,7 +249,9 @@ public class AuthService {
 
     private UserProfileResponse.CreatorProfile mapCreatorProfile(CreatorProfile profile) {
         return UserProfileResponse.CreatorProfile.builder()
-                .name(profile.getName())
+                .firstName(profile.getFirstName())
+                .lastName(profile.getLastName())
+                .displayName(profile.getDisplayName())
                 .company(profile.getCompany())
                 .profileImageUrl(profile.getProfileImageUrl())
                 .bannerImageUrl(profile.getBannerImageUrl())
@@ -245,7 +263,9 @@ public class AuthService {
 
     private UserProfileResponse.ReviewerProfile mapReviewerProfile(ReviewerProfile profile) {
         return UserProfileResponse.ReviewerProfile.builder()
-                .name(profile.getName())
+                .firstName(profile.getFirstName())
+                .lastName(profile.getLastName())
+                .displayName(profile.getDisplayName())
                 .profileImageUrl(profile.getProfileImageUrl())
                 .language(profile.getLanguage())
                 .proficiency(profile.getProficiency())

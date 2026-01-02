@@ -41,6 +41,10 @@ public class ReviewerService {
 
         if (request.getName() != null) {
             profile.setName(request.getName());
+            // Parse name into firstName and lastName
+            String[] parts = request.getName().trim().split("\\s+", 2);
+            profile.setFirstName(parts[0]);
+            profile.setLastName(parts.length > 1 ? parts[1] : "");
         }
         if (request.getProfileImageUrl() != null) {
             profile.setProfileImageUrl(request.getProfileImageUrl());
@@ -131,7 +135,9 @@ public class ReviewerService {
     private ReviewerProfileDto mapToDto(ReviewerProfile profile, String email) {
         return ReviewerProfileDto.builder()
                 .id(profile.getId())
-                .name(profile.getName())
+                .firstName(profile.getFirstName())
+                .lastName(profile.getLastName())
+                .displayName(profile.getDisplayName())
                 .email(email)
                 .profileImageUrl(profile.getProfileImageUrl())
                 .language(profile.getLanguage())

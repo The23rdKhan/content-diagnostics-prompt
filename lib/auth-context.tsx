@@ -37,22 +37,50 @@ export interface User {
   id: string
   email: string
   role: UserRole
+  phoneNumber?: string
+  country?: string
+  timezone?: string
   creatorProfile?: {
-    name: string
+    firstName: string
+    lastName: string
+    displayName: string
     company?: string
     profileImage?: string
     bannerImage?: string
+    planTier?: string
+    remainingCredits?: number
   }
   reviewerProfile?: {
-    name: string
+    firstName: string
+    lastName: string
+    displayName: string
     profileImage?: string
     languages: string[]
     qualificationPassed: boolean
+    totalEarnings?: number
+    pendingEarnings?: number
   }
   adminProfile?: {
     name: string
     permissions: string[]
   }
+}
+
+/**
+ * Sign up data for new user registration.
+ */
+export interface SignUpData {
+  email: string
+  password: string
+  role: UserRole
+  firstName: string
+  lastName: string
+  phoneNumber?: string
+  country: string
+  timezone: string
+  tosAccepted: boolean
+  marketingConsent?: boolean
+  preferredPayoutMethod?: 'PAYPAL' | 'BANK_TRANSFER' | 'STRIPE_CONNECT'
 }
 
 /**
@@ -66,9 +94,10 @@ export type { UserRole }
 interface AuthContextType {
   user: User | null
   loading: boolean
-  signUp: (email: string, password: string, role: UserRole, name: string) => Promise<void>
+  signUp: (data: SignUpData) => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  refreshUser: () => Promise<void>
   isAuthenticated: boolean
 }
 
@@ -90,20 +119,31 @@ function mapProfileToUser(profile: UserProfileResponse): User {
     id: profile.id.toString(),
     email: profile.email,
     role: profile.role,
+    phoneNumber: profile.phoneNumber,
+    country: profile.country,
+    timezone: profile.timezone,
     ...(profile.creatorProfile && {
       creatorProfile: {
-        name: profile.creatorProfile.name,
+        firstName: profile.creatorProfile.firstName,
+        lastName: profile.creatorProfile.lastName,
+        displayName: profile.creatorProfile.displayName,
         company: profile.creatorProfile.company,
         profileImage: profile.creatorProfile.profileImageUrl,
         bannerImage: profile.creatorProfile.bannerImageUrl,
+        planTier: profile.creatorProfile.planTier,
+        remainingCredits: profile.creatorProfile.remainingCredits,
       },
     }),
     ...(profile.reviewerProfile && {
       reviewerProfile: {
-        name: profile.reviewerProfile.name,
+        firstName: profile.reviewerProfile.firstName,
+        lastName: profile.reviewerProfile.lastName,
+        displayName: profile.reviewerProfile.displayName,
         profileImage: profile.reviewerProfile.profileImageUrl,
         languages: [profile.reviewerProfile.language],
         qualificationPassed: profile.reviewerProfile.qualificationPassed,
+        totalEarnings: profile.reviewerProfile.totalEarnings,
+        pendingEarnings: profile.reviewerProfile.pendingEarnings,
       },
     }),
     ...(profile.adminProfile && {
@@ -191,8 +231,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * Sign up a new user.
    */
   const signUp = useCallback(
-    async (email: string, password: string, role: UserRole, name: string) => {
-      const request: SignUpRequest = { email, password, role, name }
+    async (data: SignUpData) => {
+      const request: SignUpRequest = {
+        email: data.email,
+        password: data.password,
+        role: data.role,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phoneNumber: data.phoneNumber,
+        country: data.country,
+        timezone: data.timezone,
+        tosAccepted: data.tosAccepted,
+        marketingConsent: data.marketingConsent,
+        preferredPayoutMethod: data.preferredPayoutMethod,
+      }
 
       // Call signup API
       const response = await api.post<AccessTokenResponse>("/auth/signup", request)
@@ -244,6 +296,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  /**
+   * Refresh user data from the server.
+   * Call this after updating profile to sync the auth context.
+   */
+  const refreshUser = useCallback(async () => {
+    try {
+      const profile = await api.get<UserProfileResponse>("/auth/me")
+      const mappedUser = mapProfileToUser(profile)
+      setUser(mappedUser)
+    } catch (err) {
+      console.error("Failed to refresh user:", err)
+    }
+  }, [])
+
   return (
     <AuthContext.Provider
       value={{
@@ -252,6 +318,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp,
         signIn,
         signOut,
+        refreshUser,
         isAuthenticated: !!user,
       }}
     >

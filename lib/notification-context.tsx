@@ -65,7 +65,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const unreadCount = Array.isArray(notifications) ? notifications.filter((n) => !n.read).length : 0
 
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {
@@ -73,7 +73,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setLoading(true)
       setError(null)
       const data = await api.get<Notification[]>("/notifications")
-      setNotifications(data)
+      setNotifications(Array.isArray(data) ? data : [])
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Failed to fetch notifications"))
     } finally {

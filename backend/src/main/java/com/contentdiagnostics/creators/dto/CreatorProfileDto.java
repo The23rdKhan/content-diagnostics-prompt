@@ -19,7 +19,9 @@ public class CreatorProfileDto {
     private Long id;
     private Long userId;
     private String email;
-    private String name;
+    private String firstName;
+    private String lastName;
+    private String displayName;
     private String company;
     private String profileImageUrl;
     private String bannerImageUrl;

@@ -53,6 +53,10 @@ public class CreatorService {
 
         if (request.getName() != null) {
             profile.setName(request.getName());
+            // Parse name into firstName and lastName
+            String[] parts = request.getName().trim().split("\\s+", 2);
+            profile.setFirstName(parts[0]);
+            profile.setLastName(parts.length > 1 ? parts[1] : "");
         }
         if (request.getCompany() != null) {
             profile.setCompany(request.getCompany());
@@ -143,7 +147,9 @@ public class CreatorService {
                 .id(profile.getId())
                 .userId(profile.getUser().getId())
                 .email(profile.getUser().getEmail())
-                .name(profile.getName())
+                .firstName(profile.getFirstName())
+                .lastName(profile.getLastName())
+                .displayName(profile.getDisplayName())
                 .company(profile.getCompany())
                 .profileImageUrl(profile.getProfileImageUrl())
                 .bannerImageUrl(profile.getBannerImageUrl())

@@ -70,6 +70,11 @@ export interface UserProfileResponse {
   email: string
   role: UserRole
   emailVerified: boolean
+  phoneNumber?: string
+  country?: string
+  timezone?: string
+  tosAcceptedAt?: string
+  marketingConsent?: boolean
   createdAt: string
   lastLoginAt?: string
   creatorProfile?: CreatorProfile
@@ -81,7 +86,9 @@ export interface UserProfileResponse {
  * Creator-specific profile data.
  */
 export interface CreatorProfile {
-  name: string
+  firstName: string
+  lastName: string
+  displayName: string
   company?: string
   profileImageUrl?: string
   bannerImageUrl?: string
@@ -94,7 +101,9 @@ export interface CreatorProfile {
  * Reviewer-specific profile data.
  */
 export interface ReviewerProfile {
-  name: string
+  firstName: string
+  lastName: string
+  displayName: string
   profileImageUrl?: string
   language: string
   proficiency?: string
@@ -103,6 +112,8 @@ export interface ReviewerProfile {
   queueLocked: boolean
   tasksCompleted: number
   totalEarnings: number
+  pendingEarnings: number
+  payoutMethod?: string
 }
 
 /**
@@ -154,7 +165,14 @@ export interface SignUpRequest {
   email: string
   password: string
   role: UserRole
-  name: string
+  firstName: string
+  lastName: string
+  phoneNumber?: string
+  country: string
+  timezone: string
+  tosAccepted: boolean
+  marketingConsent?: boolean
+  preferredPayoutMethod?: 'PAYPAL' | 'BANK_TRANSFER' | 'STRIPE_CONNECT'
   company?: string
   language?: string
   proficiency?: string
