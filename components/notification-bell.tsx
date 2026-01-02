@@ -1,5 +1,6 @@
 "use client"
 
+import { useRouter } from "next/navigation"
 import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,10 +13,10 @@ import {
 import { useNotifications } from "@/lib/notification-context"
 import { useAuth } from "@/lib/auth-context"
 import { trackEvent } from "@/lib/analytics"
-import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 
 export function NotificationBell() {
+  const router = useRouter()
   const { user } = useAuth()
   const { notifications, unreadCount, markAsRead, markAllAsRead, getNotificationsByRole } = useNotifications()
 
@@ -31,9 +32,14 @@ export function NotificationBell() {
     }
   }
 
-  const handleNotificationClick = (id: string) => {
+  const handleNotificationClick = (id: string, deepLink?: string) => {
     markAsRead(id)
     trackEvent("notification_viewed", { notification_id: id })
+    router.push(deepLink || notificationsPath)
+  }
+
+  const handleViewAll = () => {
+    router.push(notificationsPath)
   }
 
   return (
@@ -63,32 +69,28 @@ export function NotificationBell() {
         ) : (
           <>
             {recentNotifications.map((notification) => (
-              <DropdownMenuItem key={notification.id} asChild className="cursor-pointer">
-                <Link
-                  href={notification.deepLink || notificationsPath}
-                  className="flex flex-col gap-1 p-3"
-                  onClick={() => handleNotificationClick(notification.id)}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1">
-                      <p className={`text-sm ${!notification.read ? "font-semibold" : ""}`}>{notification.title}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
-                    </div>
-                    {!notification.read && (
-                      <div className="mt-1 h-2 w-2 rounded-full bg-accent flex-shrink-0" aria-label="Unread" />
-                    )}
+              <DropdownMenuItem
+                key={notification.id}
+                className="cursor-pointer flex flex-col items-start gap-1 p-3"
+                onClick={() => handleNotificationClick(notification.id, notification.deepLink)}
+              >
+                <div className="flex items-start justify-between gap-2 w-full">
+                  <div className="flex-1">
+                    <p className={`text-sm ${!notification.read ? "font-semibold" : ""}`}>{notification.title}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{notification.message}</p>
                   </div>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
-                  </span>
-                </Link>
+                  {!notification.read && (
+                    <div className="mt-1 h-2 w-2 rounded-full bg-accent flex-shrink-0" aria-label="Unread" />
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                </span>
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href={notificationsPath} className="w-full text-center text-sm font-medium p-2">
-                View all notifications
-              </Link>
+            <DropdownMenuItem onClick={handleViewAll} className="cursor-pointer w-full justify-center text-sm font-medium p-2">
+              View all notifications
             </DropdownMenuItem>
           </>
         )}

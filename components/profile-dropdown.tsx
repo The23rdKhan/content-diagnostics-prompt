@@ -1,7 +1,6 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { User, Settings, CreditCard, LogOut } from "lucide-react"
 import {
   DropdownMenu,
@@ -128,23 +127,17 @@ export function ProfileDropdown({ subtitle }: ProfileDropdownProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href={getProfileLink()} className="cursor-pointer">
-            <User className="mr-2 h-4 w-4" />
-            Profile
-          </Link>
+        <DropdownMenuItem onClick={() => router.push(getProfileLink())} className="cursor-pointer">
+          <User className="mr-2 h-4 w-4" />
+          Profile
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href={getSettingsLink()} className="cursor-pointer">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </Link>
+        <DropdownMenuItem onClick={() => router.push(getSettingsLink())} className="cursor-pointer">
+          <Settings className="mr-2 h-4 w-4" />
+          Settings
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href={getBillingLink()} className="cursor-pointer">
-            <CreditCard className="mr-2 h-4 w-4" />
-            Billing
-          </Link>
+        <DropdownMenuItem onClick={() => router.push(getBillingLink())} className="cursor-pointer">
+          <CreditCard className="mr-2 h-4 w-4" />
+          Billing
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">

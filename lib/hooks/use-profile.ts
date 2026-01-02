@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react"
 import { useApi } from "./use-api"
 import { api } from "@/lib/api"
-import type { CreatorProfile, ReviewerProfile } from "@/lib/types/api"
+import type { CreatorProfile, ReviewerProfile, AdminProfile } from "@/lib/types/api"
 
 // =============================================================================
 // Types
@@ -26,6 +26,10 @@ export interface UpdateReviewerProfileRequest {
 export interface UpdatePayoutMethodRequest {
   payoutMethod: "PAYPAL" | "BANK_TRANSFER" | "STRIPE_CONNECT"
   payoutDetails?: string
+}
+
+export interface UpdateAdminProfileRequest {
+  name?: string
 }
 
 // =============================================================================
@@ -131,6 +135,49 @@ export function useReviewerProfileWithUpdate() {
     refetch,
     updateProfile,
     updatePayoutMethod,
+    updating,
+    updateError,
+  }
+}
+
+// =============================================================================
+// Admin Profile Hook
+// =============================================================================
+
+/**
+ * Hook to fetch and update admin profile.
+ */
+export function useAdminProfile() {
+  const { data, loading, error, refetch } = useApi<AdminProfile>("/admin/profile")
+  const [updating, setUpdating] = useState(false)
+  const [updateError, setUpdateError] = useState<Error | null>(null)
+
+  const updateProfile = useCallback(
+    async (updates: UpdateAdminProfileRequest): Promise<AdminProfile> => {
+      setUpdating(true)
+      setUpdateError(null)
+
+      try {
+        const result = await api.put<AdminProfile>("/admin/profile", updates)
+        await refetch()
+        return result
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error("Failed to update profile")
+        setUpdateError(error)
+        throw error
+      } finally {
+        setUpdating(false)
+      }
+    },
+    [refetch]
+  )
+
+  return {
+    profile: data,
+    loading,
+    error,
+    refetch,
+    updateProfile,
     updating,
     updateError,
   }
