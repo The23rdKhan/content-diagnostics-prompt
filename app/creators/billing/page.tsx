@@ -93,6 +93,19 @@ export default function CreatorBilling() {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        {/* Demo Mode Banner */}
+        <div className="mb-6 rounded-lg border-2 border-dashed border-amber-500/50 bg-amber-500/10 p-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-white text-xs font-bold">!</span>
+            <div>
+              <p className="font-semibold text-amber-700 dark:text-amber-400">Demo Mode</p>
+              <p className="text-sm text-amber-600 dark:text-amber-500">
+                This is a preview of the billing interface. No real charges will be applied.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <h1 className="text-3xl font-bold text-foreground mb-2">Billing & Payments</h1>
         <p className="text-muted-foreground mb-8">Manage your payment method, purchase add-ons, and view invoices.</p>
 
