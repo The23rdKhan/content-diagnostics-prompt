@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { User, Settings, LogOut } from "lucide-react"
+import { User, Settings, CreditCard, LogOut } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -94,6 +94,20 @@ export function ProfileDropdown({ subtitle }: ProfileDropdownProps) {
     }
   }
 
+  // Get billing link based on role
+  const getBillingLink = () => {
+    switch (user?.role) {
+      case "CREATOR":
+        return "/creators/billing"
+      case "REVIEWER":
+        return "/reviewers/billing"
+      case "ADMIN":
+        return "/admin/billing"
+      default:
+        return "/billing"
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -124,6 +138,12 @@ export function ProfileDropdown({ subtitle }: ProfileDropdownProps) {
           <Link href={getSettingsLink()} className="cursor-pointer">
             <Settings className="mr-2 h-4 w-4" />
             Settings
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={getBillingLink()} className="cursor-pointer">
+            <CreditCard className="mr-2 h-4 w-4" />
+            Billing
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
