@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import type React from "react"
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
@@ -179,7 +181,7 @@ export function UploadSection() {
         jobId: result.jobId,
       })
     } catch (error) {
-      console.error("Upload failed:", error)
+      logError("Upload failed", error)
       trackEvent("creator_upload_failed", {
         title: videoTitle,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -210,7 +212,7 @@ export function UploadSection() {
         }
       )
     } catch (error) {
-      console.error("Retry failed:", error)
+      logError("Retry failed", error)
     }
   }
 

@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -120,7 +122,7 @@ export default function SignUpPage() {
       } else {
         setError("Unable to connect to server. Please check your connection.")
       }
-      console.error(err)
+      logError("Sign up error", err)
     }
   }
 

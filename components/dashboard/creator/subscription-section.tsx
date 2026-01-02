@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Check, ArrowRight, AlertCircle, RefreshCw, Loader2 } from "lucide-react"
@@ -29,7 +31,7 @@ export function SubscriptionSection() {
         refetchSub()
         setTimeout(() => setChangeSuccess(false), 5000)
       } catch (err) {
-        console.error("Failed to change plan:", err)
+        logError("Failed to change plan", err)
       }
     } else {
       // First click, show confirmation

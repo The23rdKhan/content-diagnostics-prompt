@@ -1,3 +1,4 @@
+import { logError } from "@/lib/error-tracking"
 /**
  * In-Memory Auth Store
  *
@@ -176,7 +177,7 @@ class AuthStore {
 
       return false
     } catch (err) {
-      console.error("Token refresh failed:", err)
+      logError("Token refresh failed", err)
       return false
     }
   }

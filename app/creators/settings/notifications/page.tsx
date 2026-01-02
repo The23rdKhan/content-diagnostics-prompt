@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -49,7 +51,7 @@ export default function CreatorEmailPreferencesPage() {
       setHasChanges(false)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
-      console.error("Failed to save preferences:", err)
+      logError("Failed to save preferences", err)
     }
   }
 

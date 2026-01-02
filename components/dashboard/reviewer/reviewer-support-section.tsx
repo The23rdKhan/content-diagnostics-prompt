@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -43,7 +45,7 @@ export function ReviewerSupportSection() {
       refetch()
       setTimeout(() => setSubmitSuccess(false), 5000)
     } catch (err) {
-      console.error("Failed to create ticket:", err)
+      logError("Failed to create ticket", err)
     }
   }
 

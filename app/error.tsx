@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import Link from "next/link"
 import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -15,7 +17,7 @@ export default function AppError({
   const isAccessDenied = error.message === "Access denied."
 
   useEffect(() => {
-    console.error(error)
+    logError("App error", error)
   }, [error])
 
   return (

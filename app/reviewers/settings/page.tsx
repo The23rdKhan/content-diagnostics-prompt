@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useState } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -65,7 +67,7 @@ export default function ReviewerSettingsPage() {
       setPayoutSaved(true)
       setTimeout(() => setPayoutSaved(false), 3000)
     } catch (err) {
-      console.error("Failed to update payout method:", err)
+      logError("Failed to update payout method", err)
     }
   }
 

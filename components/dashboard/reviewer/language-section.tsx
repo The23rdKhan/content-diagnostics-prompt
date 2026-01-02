@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Check, AlertCircle, RefreshCw, Loader2, Save } from "lucide-react"
@@ -68,7 +70,7 @@ export function LanguageSection() {
       setHasChanges(false)
       setTimeout(() => setSaveSuccess(false), 3000)
     } catch (err) {
-      console.error("Failed to save language profile:", err)
+      logError("Failed to save language profile", err)
     }
   }
 

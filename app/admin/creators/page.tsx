@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -66,7 +68,7 @@ export default function CreatorsPage() {
       setCreditDialogOpen(false)
       refetch()
     } catch (err) {
-      console.error("Failed to grant credit:", err)
+      logError("Failed to grant credit", err)
     }
   }
 

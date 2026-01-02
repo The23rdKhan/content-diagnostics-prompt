@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { Button } from "@/components/ui/button"
 import { CreditCard, Download, FileText, AlertCircle, RefreshCw, Loader2, Building } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -48,7 +50,7 @@ export function BillingSection() {
       const url = await initiateUpdate()
       window.location.href = url
     } catch (err) {
-      console.error("Failed to initiate payment update:", err)
+      logError("Failed to initiate payment update", err)
     }
   }
 
@@ -56,7 +58,7 @@ export function BillingSection() {
     try {
       await downloadInvoice(invoiceId)
     } catch (err) {
-      console.error("Failed to download invoice:", err)
+      logError("Failed to download invoice", err)
     }
   }
 

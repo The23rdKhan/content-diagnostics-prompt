@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -139,7 +141,7 @@ export function TaskQueueSection() {
       setShowAcceptModal(null)
     } catch (err) {
       // Error is already set in useTaskActions hook
-      console.error("Failed to accept task:", err)
+      logError("Failed to accept task", err)
     } finally {
       setPendingAcceptId(null)
     }
@@ -197,7 +199,7 @@ export function TaskQueueSection() {
       // Refresh tasks and earnings
       await Promise.all([refetchTasks(), refetchEarnings()])
     } catch (err) {
-      console.error("Failed to submit task:", err)
+      logError("Failed to submit task", err)
       // Don't optimistically update on error - just close modal and refresh
       setActiveTask(null)
       refetchTasks()

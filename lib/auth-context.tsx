@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 /**
  * Auth Context
  *
@@ -198,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         // Session restoration failed - user needs to sign in
-        console.error("Session bootstrap failed:", err)
+        logError("Session bootstrap failed", err)
         authStore.clear()
       } finally {
         if (mounted) {
@@ -306,7 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const mappedUser = mapProfileToUser(profile)
       setUser(mappedUser)
     } catch (err) {
-      console.error("Failed to refresh user:", err)
+      logError("Failed to refresh user", err)
     }
   }, [])
 

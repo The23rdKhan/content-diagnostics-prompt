@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -57,7 +59,7 @@ export function PayoutSection() {
       trackEvent("reviewer_payout_method_saved", { method: payoutMethod })
       setTimeout(() => setIsSaved(false), 3000)
     } catch (err) {
-      console.error("Failed to save payout settings:", err)
+      logError("Failed to save payout settings", err)
     }
   }
 

@@ -85,6 +85,7 @@ export function captureErrorBoundary(
  */
 export function captureWarning(message: string, context?: ErrorContext): void {
   if (process.env.NODE_ENV === "development") {
+    // eslint-disable-next-line no-console
     console.warn(`[${context?.section || "Warning"}]`, message, context?.extra)
   }
 
@@ -92,5 +93,19 @@ export function captureWarning(message: string, context?: ErrorContext): void {
   const sentry = getSentry()
   if (sentry) {
     // Sentry.captureMessage would be used here when SDK is installed
+  }
+}
+
+/**
+ * Log an error in development only.
+ * Use this for non-critical errors that don't need production tracking.
+ *
+ * @param message - Error message or prefix
+ * @param error - The error object
+ */
+export function logError(message: string, error?: unknown): void {
+  if (process.env.NODE_ENV === "development") {
+    // eslint-disable-next-line no-console
+    console.error(`[${message}]`, error)
   }
 }

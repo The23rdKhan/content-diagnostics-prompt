@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -67,7 +69,7 @@ export default function AdminProfile() {
       setHasChanges(false)
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
-      console.error("Failed to save profile:", err)
+      logError("Failed to save profile", err)
     }
   }
 

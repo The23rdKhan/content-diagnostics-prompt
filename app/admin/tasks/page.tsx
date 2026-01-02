@@ -1,5 +1,7 @@
 "use client"
 
+import { logError } from "@/lib/error-tracking"
+
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -33,7 +35,7 @@ export default function TasksPage() {
       setSelectedTasks([])
       refetch()
     } catch (err) {
-      console.error("Bulk action failed:", err)
+      logError("Bulk action failed", err)
     }
   }
 
