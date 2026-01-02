@@ -32,6 +32,18 @@ public class ReviewerController {
     private final TaskService taskService;
 
     /**
+     * Get reviewer profile.
+     * GET /api/reviewer/profile
+     */
+    @GetMapping("/profile")
+    public ResponseEntity<ApiResponse<ReviewerProfileDto>> getProfile() {
+        User user = SecurityUtils.getCurrentUser();
+        ReviewerProfileDto profile = reviewerService.getProfile(user);
+
+        return ResponseEntity.ok(ApiResponse.success(profile));
+    }
+
+    /**
      * Update reviewer profile.
      * PUT /api/reviewer/profile
      */
