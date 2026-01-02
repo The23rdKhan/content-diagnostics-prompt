@@ -2,25 +2,26 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CREATOR_PLANS } from "@/components/creator/plan-selector"
-import { CapacityGatingModal } from "@/components/creator/capacity-gating-modal"
 import { trackEvent } from "@/lib/analytics"
-import { AlertCircle } from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Lock } from "lucide-react"
+import { api, ApiRequestError } from "@/lib/api"
 import { LoadingScreen } from "@/components/loading-screen"
+import { Lock, ArrowLeft, CreditCard, Shield, Loader2, AlertCircle } from "lucide-react"
+
+interface CheckoutSessionResponse {
+  sessionId: string
+  url: string
+}
 
 export default function CreatorCheckout() {
-  const [cardNumber, setCardNumber] = useState("")
-  const [processingPayment, setProcessingPayment] = useState(false)
-  const [showCapacityGating, setShowCapacityGating] = useState(false)
-  const [selectedLanguage] = useState("English") // Locked to English for MVP
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
-  const [validationError, setValidationError] = useState<string | null>(null)
 
   // State for sessionStorage values (initialized in useEffect to avoid SSR hydration mismatch)
   const [selectedPlan, setSelectedPlan] = useState("basic")
@@ -29,7 +30,6 @@ export default function CreatorCheckout() {
   const router = useRouter()
 
   // Guard: Ensure user has selected a plan before accessing checkout
-  // Also hydrate sessionStorage values on client
   useEffect(() => {
     const plan = sessionStorage.getItem("selected_plan")
     const addons = sessionStorage.getItem("selected_addons")
@@ -52,30 +52,45 @@ export default function CreatorCheckout() {
     return <LoadingScreen />
   }
 
-  const handleCheckout = async () => {
-    setValidationError(null)
-
-    if (!cardNumber.trim()) {
-      setValidationError("Please enter a card number")
-      return
-    }
+  const handleProceedToPayment = async () => {
+    setError(null)
+    setIsProcessing(true)
 
     trackEvent("checkout_started", { plan: selectedPlan, total })
-    setShowCapacityGating(true)
-  }
 
-  const handleCapacityConfirmed = async () => {
-    setProcessingPayment(true)
-    trackEvent("capacity_confirmed", { language: selectedLanguage })
+    try {
+      const response = await api.post<CheckoutSessionResponse>(
+        "/billing/stripe/checkout-session",
+        {
+          planTier: selectedPlan,
+          successUrl: `${window.location.origin}/creators/onboarding/checkout/success`,
+          cancelUrl: `${window.location.origin}/creators/onboarding/checkout`,
+        }
+      )
 
-    // Simulate payment processing
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+      trackEvent("stripe_redirect", { plan: selectedPlan })
 
-    trackEvent("checkout_completed", { plan: selectedPlan, total })
-    sessionStorage.removeItem("selected_plan")
-    sessionStorage.removeItem("selected_addons")
-    router.push("/creators/onboarding/welcome")
-    setProcessingPayment(false)
+      // Redirect to Stripe hosted checkout
+      window.location.href = response.url
+    } catch (err) {
+      setIsProcessing(false)
+
+      if (err instanceof ApiRequestError) {
+        if (err.status === 401) {
+          setError("Please sign in to continue with checkout.")
+          router.push("/auth/sign-in?redirect=/creators/onboarding/checkout")
+          return
+        } else if (err.status === 404) {
+          setError("Payment processing is not available yet. Please contact support.")
+        } else {
+          setError(err.message || "Failed to start checkout. Please try again.")
+        }
+      } else {
+        setError("Unable to connect to payment service. Please try again.")
+      }
+
+      trackEvent("checkout_error", { plan: selectedPlan, error: String(err) })
+    }
   }
 
   return (
@@ -89,25 +104,21 @@ export default function CreatorCheckout() {
         <div className="mb-12">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
             <span>1. Plan Selection →</span>
-            <span className="text-foreground">2. Checkout</span>
+            <span className="text-foreground font-medium">2. Checkout</span>
             <span>→ 3. Welcome</span>
           </div>
 
           <h1 className="text-4xl font-bold text-foreground mb-2">Complete Your Checkout</h1>
-          <p className="text-lg text-muted-foreground">Review your plan and complete payment to get started</p>
+          <p className="text-lg text-muted-foreground">Review your order and proceed to secure payment</p>
         </div>
 
-        {/* Capacity Gating Modal */}
-        <CapacityGatingModal
-          isOpen={showCapacityGating}
-          selectedLanguage={selectedLanguage}
-          selectedSLA={selectedPlan as "fast" | "standard" | "economy"}
-          onClose={() => setShowCapacityGating(false)}
-          onSelect={(option) => {
-            trackEvent("capacity_option_selected", { option: option.id })
-            handleCapacityConfirmed()
-          }}
-        />
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Order summary */}
@@ -122,17 +133,20 @@ export default function CreatorCheckout() {
                   <p className="text-sm text-muted-foreground">
                     {plan?.reviewersPerVideo} reviewers • {plan?.deliveryDays}-day delivery
                   </p>
-                  <div className="text-xl font-bold text-accent mt-2">${plan?.price}</div>
+                  <div className="text-xl font-bold text-accent mt-2">${plan?.price}/mo</div>
                 </div>
 
                 {selectedAddons.length > 0 && (
                   <div className="pt-4 border-t border-border">
                     <h4 className="font-semibold mb-2">Add-ons</h4>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Add-ons will be available for purchase from your dashboard after subscription.
+                    </p>
                     <div className="space-y-2">
                       {selectedAddons.map((addon: string) => (
                         <div key={addon} className="flex justify-between text-sm">
                           <span className="text-muted-foreground">{addon}</span>
-                          <span>$25</span>
+                          <span className="text-muted-foreground">Coming soon</span>
                         </div>
                       ))}
                     </div>
@@ -140,8 +154,8 @@ export default function CreatorCheckout() {
                 )}
 
                 <div className="pt-4 border-t border-border flex justify-between">
-                  <span className="font-semibold">Total</span>
-                  <span className="text-xl font-bold text-accent">${total}</span>
+                  <span className="font-semibold">Monthly Total</span>
+                  <span className="text-xl font-bold text-accent">${plan?.price}/mo</span>
                 </div>
 
                 <div className="pt-4 border-t border-border">
@@ -161,51 +175,65 @@ export default function CreatorCheckout() {
             </Card>
           </div>
 
-          {/* Payment form */}
+          {/* Payment section */}
           <div>
             <Card>
               <CardHeader>
-                <CardTitle>Payment Details</CardTitle>
-                <CardDescription>Internal testing only. Not representative of public performance.</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Secure Payment
+                </CardTitle>
+                <CardDescription>
+                  You&apos;ll be redirected to Stripe to complete your payment securely.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Alert className="border-accent/30 bg-accent/5">
-                  <AlertCircle className="h-4 w-4 text-accent" />
-                  <AlertDescription className="text-sm">
-                    This is a mock checkout. No payment will be processed. Use any test card number.
-                  </AlertDescription>
-                </Alert>
+                <div className="rounded-lg bg-muted/50 p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Shield className="h-5 w-5 text-accent mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">Secure checkout powered by Stripe</p>
+                      <p className="text-xs text-muted-foreground">
+                        Your payment information is encrypted and secure.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>• Cancel anytime from your dashboard</p>
+                    <p>• Subscription renews monthly</p>
+                    <p>• Receipt sent to your email</p>
+                  </div>
+                </div>
 
-                <div>
-                  <label className="text-sm font-medium">Card Number</label>
-                  <Input
-                    placeholder="4242 4242 4242 4242"
-                    value={cardNumber}
-                    onChange={(e) => {
-                      setCardNumber(e.target.value)
-                      setValidationError(null)
-                    }}
-                    disabled={processingPayment}
-                    className={`mt-1 ${validationError ? "border-destructive" : ""}`}
-                  />
-                  {validationError && (
-                    <p className="text-sm text-destructive mt-1">{validationError}</p>
+                <Button
+                  onClick={handleProceedToPayment}
+                  disabled={isProcessing}
+                  className="w-full"
+                  size="lg"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Redirecting to payment...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Proceed to Payment
+                    </>
                   )}
-                </div>
+                </Button>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Expiry Date</label>
-                    <Input placeholder="MM/YY" disabled={processingPayment} className="mt-1" />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">CVC</label>
-                    <Input placeholder="123" disabled={processingPayment} className="mt-1" />
-                  </div>
-                </div>
-
-                <Button onClick={handleCheckout} disabled={processingPayment} className="w-full" size="lg">
-                  {processingPayment ? "Processing..." : "Complete Purchase"}
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  asChild
+                  disabled={isProcessing}
+                >
+                  <Link href="/creators/onboarding/plan">
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Change Plan
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
