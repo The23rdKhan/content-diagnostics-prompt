@@ -3,6 +3,13 @@ import { Button } from "@/components/ui/button"
 import { Header } from "@/components/marketing/header"
 import { Footer } from "@/components/marketing/footer"
 import { FileText, BookOpen, Video, HelpCircle } from "lucide-react"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Resources",
+  description:
+    "Guides, documentation, and help for getting the most from Content Diagnostics. Learn how to improve your content with our tools.",
+}
 
 export default function ResourcesPage() {
   return (

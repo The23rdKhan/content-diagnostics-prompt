@@ -3,6 +3,13 @@ import { Button } from "@/components/ui/button"
 import { Header } from "@/components/marketing/header"
 import { Footer } from "@/components/marketing/footer"
 import { ArrowRight, ArrowLeft, Download, Share2, BarChart3, Clock, AlertCircle, CheckCircle2 } from "lucide-react"
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Sample Report",
+  description:
+    "See a real example of a Content Diagnostics report with AI analysis, human reviewer feedback, timeline insights, and actionable recommendations.",
+}
 
 export default function SampleReportPage() {
   return (

@@ -11,11 +11,62 @@ import "./globals.css"
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://contentdiagnostics.com"
+
 export const metadata: Metadata = {
-  title: "Content Diagnostics | Test Content Before You Publish",
+  title: {
+    default: "Content Diagnostics | Test Content Before You Publish",
+    template: "%s | Content Diagnostics",
+  },
   description:
     "Test content privately using AI diagnostics and paid human reviewers to identify clarity issues, pacing problems, and attention drop-offs before release.",
-  generator: "v0.app",
+  keywords: [
+    "content testing",
+    "video feedback",
+    "content diagnostics",
+    "video review",
+    "content analysis",
+    "AI video analysis",
+    "creator tools",
+  ],
+  authors: [{ name: "Content Diagnostics" }],
+  creator: "Content Diagnostics",
+  metadataBase: new URL(siteUrl),
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: siteUrl,
+    siteName: "Content Diagnostics",
+    title: "Content Diagnostics | Test Content Before You Publish",
+    description:
+      "Get actionable feedback on your videos before publishing. AI diagnostics + paid human reviewers identify clarity issues, pacing problems, and engagement drop-offs.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Content Diagnostics - Test Content Before You Publish",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Content Diagnostics | Test Content Before You Publish",
+    description:
+      "Get actionable feedback on your videos before publishing. AI diagnostics + paid human reviewers.",
+    images: ["/og-image.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   icons: {
     icon: [
       {
