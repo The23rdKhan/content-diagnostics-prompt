@@ -1,11 +1,48 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { AlertCircle, Plus } from "lucide-react"
+import { AlertCircle, Plus, Users, Zap, FileText, Video, ArrowLeft } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ThemeToggle } from "@/components/theme-toggle"
+
+const addons = [
+  {
+    id: "reviewers",
+    name: "Additional Reviewers",
+    description: "Add more reviewers to any submission for deeper insights",
+    price: "$1.50",
+    unit: "per reviewer",
+    icon: Users,
+  },
+  {
+    id: "delivery",
+    name: "Faster Delivery",
+    description: "Expedite your feedback turnaround to 12 hours",
+    price: "$25",
+    unit: "per video",
+    icon: Zap,
+  },
+  {
+    id: "summary",
+    name: "Full-Watch Summary",
+    description: "Extended reviewer summaries for longer content",
+    price: "$15",
+    unit: "per video",
+    icon: FileText,
+  },
+  {
+    id: "live",
+    name: "Live Feedback Session",
+    description: "Real-time feedback from reviewers (availability-based)",
+    price: "$99",
+    unit: "per session",
+    icon: Video,
+  },
+]
 
 export default function CreatorBilling() {
   const [invoices] = useState([
@@ -43,10 +80,21 @@ export default function CreatorBilling() {
   })
 
   return (
-    <div className="min-h-screen bg-background py-12">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <h1 className="text-4xl font-bold text-foreground mb-2">Billing & Invoices</h1>
-        <p className="text-lg text-muted-foreground mb-12">Manage your payment method and view invoices.</p>
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-10 border-b border-border bg-card/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+          <Link href="/creators/dashboard" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Link>
+          <ThemeToggle />
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <h1 className="text-3xl font-bold text-foreground mb-2">Billing & Payments</h1>
+        <p className="text-muted-foreground mb-8">Manage your payment method, purchase add-ons, and view invoices.</p>
 
         <div className="grid gap-6 lg:grid-cols-3 mb-12">
           {/* Payment Method Card */}
@@ -107,6 +155,40 @@ export default function CreatorBilling() {
             </AlertDescription>
           </Alert>
         </div>
+
+        {/* Add-ons Section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Available Add-ons</CardTitle>
+            <CardDescription>Enhance your video reviews with additional features</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {addons.map((addon) => (
+                <div
+                  key={addon.id}
+                  className="rounded-lg border border-border p-4 hover:border-accent/50 transition-colors"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 mb-3">
+                    <addon.icon className="h-5 w-5 text-accent" />
+                  </div>
+                  <h3 className="font-semibold text-foreground">{addon.name}</h3>
+                  <p className="text-sm text-muted-foreground mt-1 mb-3">{addon.description}</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-lg font-bold text-accent">{addon.price}</span>
+                      <span className="text-xs text-muted-foreground ml-1">{addon.unit}</span>
+                    </div>
+                    <Button size="sm" variant="outline">
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Invoices */}
         <Card>
