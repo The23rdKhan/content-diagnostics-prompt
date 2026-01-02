@@ -39,10 +39,10 @@ public class StripeService {
     private final StripeEventRepository stripeEventRepository;
     private final CreatorProfileRepository creatorProfileRepository;
 
-    @Value("${stripe.secret-key}")
+    @Value("${stripe.secret-key:}")
     private String stripeSecretKey;
 
-    @Value("${stripe.webhook-secret}")
+    @Value("${stripe.webhook-secret:}")
     private String webhookSecret;
 
     @Value("${stripe.price-ids.basic:}")
@@ -54,15 +54,35 @@ public class StripeService {
     @Value("${stripe.price-ids.enterprise:}")
     private String enterprisePriceId;
 
+    private boolean stripeConfigured = false;
+
     @PostConstruct
     public void init() {
-        Stripe.apiKey = stripeSecretKey;
+        if (isValidStripeKey(stripeSecretKey)) {
+            Stripe.apiKey = stripeSecretKey;
+            stripeConfigured = true;
+            log.info("Stripe configured successfully");
+        } else {
+            log.warn("Stripe not configured - billing features disabled. Set STRIPE_SECRET_KEY to enable.");
+        }
+    }
+
+    private boolean isValidStripeKey(String key) {
+        return key != null && !key.isEmpty() && !key.contains("placeholder") && key.startsWith("sk_");
+    }
+
+    public boolean isStripeConfigured() {
+        return stripeConfigured;
     }
 
     /**
      * Create a checkout session for subscription.
      */
     public CheckoutSessionResponse createCheckoutSession(User user, CheckoutSessionRequest request) {
+        if (!stripeConfigured) {
+            throw new BadRequestException("Stripe is not configured. Set STRIPE_SECRET_KEY environment variable.");
+        }
+
         CreatorProfile profile = creatorProfileRepository.findByUser(user)
                 .orElseThrow(() -> new ResourceNotFoundException("Creator profile", user.getId().toString()));
 
@@ -114,6 +134,10 @@ public class StripeService {
      * Create a customer portal session.
      */
     public PortalSessionResponse createPortalSession(User user, String returnUrl) {
+        if (!stripeConfigured) {
+            throw new BadRequestException("Stripe is not configured. Set STRIPE_SECRET_KEY environment variable.");
+        }
+
         CreatorProfile profile = creatorProfileRepository.findByUser(user)
                 .orElseThrow(() -> new ResourceNotFoundException("Creator profile", user.getId().toString()));
 
@@ -148,6 +172,11 @@ public class StripeService {
      */
     @Transactional
     public void handleWebhook(String payload, String signature) {
+        if (!stripeConfigured) {
+            log.warn("Stripe webhook received but Stripe is not configured");
+            throw new BadRequestException("Stripe is not configured");
+        }
+
         Event event;
         try {
             event = Webhook.constructEvent(payload, signature, webhookSecret);

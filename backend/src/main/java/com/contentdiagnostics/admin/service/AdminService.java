@@ -129,6 +129,7 @@ public class AdminService {
         oldValues.put("strikes", profile.getStrikes());
         oldValues.put("qualityScore", profile.getQualityScore());
         oldValues.put("queueLocked", profile.isQueueLocked());
+        oldValues.put("qualificationPassed", profile.isQualificationPassed());
 
         // Apply changes
         if (request.getStrikes() != null) {
@@ -140,6 +141,9 @@ public class AdminService {
         if (request.getQueueLocked() != null) {
             profile.setQueueLocked(request.getQueueLocked());
         }
+        if (request.getQualificationPassed() != null) {
+            profile.setQualificationPassed(request.getQualificationPassed());
+        }
 
         profile = reviewerProfileRepository.save(profile);
 
@@ -148,6 +152,7 @@ public class AdminService {
         newValues.put("strikes", profile.getStrikes());
         newValues.put("qualityScore", profile.getQualityScore());
         newValues.put("queueLocked", profile.isQueueLocked());
+        newValues.put("qualificationPassed", profile.isQualificationPassed());
 
         // Audit log the change
         auditService.recordAdminAction(

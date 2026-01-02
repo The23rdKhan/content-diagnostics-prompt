@@ -32,7 +32,14 @@ docker compose logs -f app
 docker compose down
 ```
 
-The API will be available at `http://localhost:8080`
+The API will be available at `http://localhost:8080/api`
+
+### Default Admin Account
+
+After first run, an admin user is seeded:
+- **Email:** `admin@contentdiagnostics.com`
+- **Password:** `admin123`
+- **Important:** Change this password immediately in production!
 
 ### Running Locally (Development)
 
@@ -67,6 +74,9 @@ docker compose up -d postgres localstack
 | `STRIPE_SECRET_KEY` | Stripe API secret key | - |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | - |
 | `RESEND_API_KEY` | Resend API key for emails | - |
+| `DEBUG_TOOLS_ENABLED` | Enable debug endpoints | `false` |
+
+Copy `.env.example` to `.env` and fill in your values for local development.
 
 ## API Endpoints
 

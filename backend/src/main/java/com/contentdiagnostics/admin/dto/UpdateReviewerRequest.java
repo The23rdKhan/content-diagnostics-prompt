@@ -18,4 +18,5 @@ public class UpdateReviewerRequest {
     private Integer strikes;
     private Integer qualityScore;
     private Boolean queueLocked;
+    private Boolean qualificationPassed;
 }

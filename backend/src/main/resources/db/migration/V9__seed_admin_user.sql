@@ -1,14 +1,14 @@
 -- Seed initial admin user
 -- IMPORTANT: Password must be changed immediately after first login
--- Default password: ChangeMe123! (bcrypt hashed)
+-- Default password: admin123 (bcrypt hashed)
 -- This migration only runs if no admin exists
 
 -- Insert admin user only if not exists
 INSERT INTO users (email, password_hash, role, enabled, created_at, updated_at)
 SELECT
     'admin@contentdiagnostics.com',
-    -- Bcrypt hash of 'ChangeMe123!' - MUST be changed on first login
-    '$2a$10$N9qo8uLOickgx2ZMRZoMy.MRMlRl/bFR7/I4.LxLxLxLxLxLxLxLu',
+    -- Bcrypt hash of 'admin123' - MUST be changed on first login
+    '$2a$10$xtYPPNdZZZbIzo3x0TRDIO5heOpcKJ1GbYo0PhYAuDn.ZReRFt.Fa',
     'ADMIN',
     true,
     NOW(),
