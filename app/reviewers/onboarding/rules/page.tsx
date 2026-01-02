@@ -21,6 +21,7 @@ export default function ReviewerRules() {
     }
 
     trackEvent("rules_accepted")
+    sessionStorage.setItem("rules_accepted", "true")
     router.push("/reviewers/onboarding/language")
   }
 

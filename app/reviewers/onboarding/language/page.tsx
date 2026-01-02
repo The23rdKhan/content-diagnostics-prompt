@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,13 +11,36 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function ReviewerLanguage() {
   const [proficiency, setProficiency] = useState<"native" | "fluent" | "intermediate">("fluent")
+  const [isReady, setIsReady] = useState(false)
   const router = useRouter()
+
+  // Guard: Ensure user has accepted rules before accessing language page
+  useEffect(() => {
+    const rulesAccepted = sessionStorage.getItem("rules_accepted")
+    if (!rulesAccepted) {
+      router.replace("/reviewers/onboarding/rules")
+    } else {
+      setIsReady(true)
+    }
+  }, [router])
 
   const proficiencyOptions = [
     { value: "native", label: "Native", description: "English is my first language" },
     { value: "fluent", label: "Fluent", description: "I speak English at a professional level" },
     { value: "intermediate", label: "Intermediate", description: "I can understand and review English content" },
   ]
+
+  // Don't render until we've verified the prerequisite step was completed
+  if (!isReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent mx-auto" />
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleContinue = () => {
     trackEvent("language_selected", { language: "English", proficiency })

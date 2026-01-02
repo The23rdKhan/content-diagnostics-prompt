@@ -4,12 +4,16 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Plus, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 
 export default function CreatorAddOns() {
   const [purchasedAddons, setPurchasedAddons] = useState<string[]>([])
   const [showConfirm, setShowConfirm] = useState(false)
   const [selectedAddon, setSelectedAddon] = useState<string | null>(null)
+  const [isPurchasing, setIsPurchasing] = useState(false)
+  const [purchaseSuccess, setPurchaseSuccess] = useState<string | null>(null)
+  const [purchaseError, setPurchaseError] = useState<string | null>(null)
 
   const addons = [
     {
@@ -54,21 +58,38 @@ export default function CreatorAddOns() {
   const handleSelectAddon = (addonId: string) => {
     const addon = addons.find((a) => a.id === addonId)
     if (addon?.disabled) {
-      alert("This add-on requires availability slots. Check back later.")
+      setPurchaseError("This add-on requires availability slots. Check back later.")
+      setTimeout(() => setPurchaseError(null), 5000)
       return
     }
 
+    setPurchaseError(null)
+    setPurchaseSuccess(null)
     setSelectedAddon(addonId)
     setShowConfirm(true)
   }
 
-  const handlePurchaseAddon = () => {
-    if (selectedAddon && !purchasedAddons.includes(selectedAddon)) {
+  const handlePurchaseAddon = async () => {
+    if (!selectedAddon || purchasedAddons.includes(selectedAddon)) return
+
+    setIsPurchasing(true)
+    setPurchaseError(null)
+
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500))
+
+      const addon = addons.find((a) => a.id === selectedAddon)
       setPurchasedAddons([...purchasedAddons, selectedAddon])
-      alert("Add-on purchased successfully!")
+      setPurchaseSuccess(`${addon?.name} purchased successfully!`)
+      setTimeout(() => setPurchaseSuccess(null), 5000)
+    } catch {
+      setPurchaseError("Failed to purchase add-on. Please try again.")
+    } finally {
+      setIsPurchasing(false)
+      setShowConfirm(false)
+      setSelectedAddon(null)
     }
-    setShowConfirm(false)
-    setSelectedAddon(null)
   }
 
   return (
@@ -78,6 +99,20 @@ export default function CreatorAddOns() {
         <p className="text-lg text-muted-foreground mb-8">
           Enhance your review package with optional add-ons for better insights and faster delivery.
         </p>
+
+        {/* Success/Error alerts */}
+        {purchaseSuccess && (
+          <Alert className="mb-6 border-green-500/30 bg-green-500/10">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-600">{purchaseSuccess}</AlertDescription>
+          </Alert>
+        )}
+        {purchaseError && (
+          <Alert className="mb-6 border-destructive/30 bg-destructive/10">
+            <AlertCircle className="h-4 w-4 text-destructive" />
+            <AlertDescription className="text-destructive">{purchaseError}</AlertDescription>
+          </Alert>
+        )}
 
         {/* Add-on cards */}
         <div className="grid gap-6 md:grid-cols-2">
@@ -155,10 +190,17 @@ export default function CreatorAddOns() {
                 This add-on will be available for your next video submission.
               </p>
               <div className="flex gap-3">
-                <Button onClick={handlePurchaseAddon} className="flex-1">
-                  Confirm Purchase
+                <Button onClick={handlePurchaseAddon} disabled={isPurchasing} className="flex-1">
+                  {isPurchasing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Confirm Purchase"
+                  )}
                 </Button>
-                <Button variant="outline" onClick={() => setShowConfirm(false)} className="flex-1">
+                <Button variant="outline" onClick={() => setShowConfirm(false)} disabled={isPurchasing} className="flex-1">
                   Cancel
                 </Button>
               </div>

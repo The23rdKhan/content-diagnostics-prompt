@@ -4,24 +4,80 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Check } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ArrowRight, Check, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 import { CREATOR_PLANS } from "@/components/creator/plan-selector"
 
 export default function CreatorSubscription() {
   const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const currentPlan = "basic" // In production, fetch from user session
 
   const activePlan = CREATOR_PLANS.find((p) => p.id === currentPlan)
   const upgradablePlans = CREATOR_PLANS.filter((p) => p.id !== currentPlan)
 
+  const handlePlanChange = async () => {
+    setIsProcessing(true)
+    setErrorMessage(null)
+
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500))
+
+      const newPlanId = sessionStorage.getItem("upgrade_plan")
+      const newPlan = CREATOR_PLANS.find(p => p.id === newPlanId)
+      setSuccessMessage(`Successfully changed to ${newPlan?.name} plan!`)
+      setTimeout(() => setSuccessMessage(null), 5000)
+    } catch {
+      setErrorMessage("Failed to update plan. Please try again.")
+    } finally {
+      setIsProcessing(false)
+      setShowUpgradeConfirm(false)
+    }
+  }
+
+  const handleCancelSubscription = async () => {
+    setIsProcessing(true)
+    setErrorMessage(null)
+
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500))
+
+      setSuccessMessage("Subscription cancelled. You can reactivate anytime.")
+      setTimeout(() => setSuccessMessage(null), 5000)
+    } catch {
+      setErrorMessage("Failed to cancel subscription. Please try again.")
+    } finally {
+      setIsProcessing(false)
+      setShowCancelConfirm(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background py-12">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <h1 className="text-4xl font-bold text-foreground mb-2">Subscription & Billing</h1>
-        <p className="text-lg text-muted-foreground mb-12">
+        <p className="text-lg text-muted-foreground mb-8">
           Manage your current plan, upgrade, downgrade, or cancel anytime.
         </p>
+
+        {/* Success/Error alerts */}
+        {successMessage && (
+          <Alert className="mb-6 border-green-500/30 bg-green-500/10">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-600">{successMessage}</AlertDescription>
+          </Alert>
+        )}
+        {errorMessage && (
+          <Alert className="mb-6 border-destructive/30 bg-destructive/10">
+            <AlertCircle className="h-4 w-4 text-destructive" />
+            <AlertDescription className="text-destructive">{errorMessage}</AlertDescription>
+          </Alert>
+        )}
 
         {/* Current Plan */}
         <div className="mb-12">
@@ -88,14 +144,19 @@ export default function CreatorSubscription() {
                 <div className="flex gap-3">
                   <Button
                     variant="destructive"
-                    onClick={() => {
-                      alert("Subscription cancelled. You'll be able to reactivate anytime.")
-                      setShowCancelConfirm(false)
-                    }}
+                    onClick={handleCancelSubscription}
+                    disabled={isProcessing}
                   >
-                    Yes, Cancel Subscription
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Cancelling...
+                      </>
+                    ) : (
+                      "Yes, Cancel Subscription"
+                    )}
                   </Button>
-                  <Button variant="outline" onClick={() => setShowCancelConfirm(false)}>
+                  <Button variant="outline" onClick={() => setShowCancelConfirm(false)} disabled={isProcessing}>
                     Keep My Subscription
                   </Button>
                 </div>
@@ -158,14 +219,19 @@ export default function CreatorSubscription() {
                 </p>
                 <div className="flex gap-3">
                   <Button
-                    onClick={() => {
-                      alert("Plan updated successfully!")
-                      setShowUpgradeConfirm(false)
-                    }}
+                    onClick={handlePlanChange}
+                    disabled={isProcessing}
                   >
-                    Confirm Plan Change
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      "Confirm Plan Change"
+                    )}
                   </Button>
-                  <Button variant="outline" onClick={() => setShowUpgradeConfirm(false)}>
+                  <Button variant="outline" onClick={() => setShowUpgradeConfirm(false)} disabled={isProcessing}>
                     Cancel
                   </Button>
                 </div>

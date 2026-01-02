@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,18 @@ export default function ReviewerQualification() {
   const [taskStarted, setTaskStarted] = useState(false)
   const [answers, setAnswers] = useState<Record<number, string>>({})
   const [qualificationResult, setQualificationResult] = useState<"pending" | "pass" | "fail">("pending")
+  const [isReady, setIsReady] = useState(false)
   const router = useRouter()
+
+  // Guard: Ensure user has completed language selection before accessing qualification
+  useEffect(() => {
+    const language = sessionStorage.getItem("selected_language")
+    if (!language) {
+      router.replace("/reviewers/onboarding/language")
+    } else {
+      setIsReady(true)
+    }
+  }, [router])
 
   const questions = [
     {
@@ -51,6 +62,18 @@ export default function ReviewerQualification() {
       correct: "a",
     },
   ]
+
+  // Don't render until we've verified the prerequisite step was completed
+  if (!isReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent mx-auto" />
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleStartTask = () => {
     trackEvent("qualification_started")

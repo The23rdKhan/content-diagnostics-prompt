@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -18,14 +18,39 @@ export default function CreatorCheckout() {
   const [processingPayment, setProcessingPayment] = useState(false)
   const [showCapacityGating, setShowCapacityGating] = useState(false)
   const [selectedLanguage] = useState("English") // Locked to English for MVP
+  const [isReady, setIsReady] = useState(false)
   const router = useRouter()
 
-  const selectedPlan = sessionStorage.getItem("selected_plan") || "basic"
-  const selectedAddons = JSON.parse(sessionStorage.getItem("selected_addons") || "[]")
+  // Guard: Ensure user has selected a plan before accessing checkout
+  useEffect(() => {
+    const plan = sessionStorage.getItem("selected_plan")
+    if (!plan) {
+      router.replace("/creators/onboarding/plan")
+    } else {
+      setIsReady(true)
+    }
+  }, [router])
+
+  const selectedPlan = (typeof window !== "undefined" && sessionStorage.getItem("selected_plan")) || "basic"
+  const selectedAddons = typeof window !== "undefined"
+    ? JSON.parse(sessionStorage.getItem("selected_addons") || "[]")
+    : []
 
   const plan = CREATOR_PLANS.find((p) => p.id === selectedPlan)
   const addonsTotal = selectedAddons.length * 25
   const total = (plan?.price || 49) + addonsTotal
+
+  // Don't render until we've verified the prerequisite step was completed
+  if (!isReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent mx-auto" />
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleCheckout = async () => {
     if (!cardNumber) {

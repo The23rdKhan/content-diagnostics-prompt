@@ -42,6 +42,7 @@ export default function ReviewerProfilePage() {
   })
   const [hasChanges, setHasChanges] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   // Sync profile data to form
   useEffect(() => {
@@ -62,6 +63,17 @@ export default function ReviewerProfilePage() {
   }
 
   const handleSave = async () => {
+    // Validate required fields
+    setValidationError(null)
+    if (!formData.name?.trim()) {
+      setValidationError("Display name is required")
+      return
+    }
+    if (formData.name.trim().length < 2) {
+      setValidationError("Display name must be at least 2 characters")
+      return
+    }
+
     try {
       await updateProfile(formData)
       await refreshUser() // Sync auth context so dashboard shows updated info
@@ -180,9 +192,9 @@ export default function ReviewerProfilePage() {
             </div>
           </div>
 
-          {updateError && (
+          {(updateError || validationError) && (
             <div className="mt-4 rounded-lg bg-destructive/10 border border-destructive/30 p-3">
-              <p className="text-sm text-destructive">{updateError.message}</p>
+              <p className="text-sm text-destructive">{validationError || updateError?.message}</p>
             </div>
           )}
 
