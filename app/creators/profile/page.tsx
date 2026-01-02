@@ -92,6 +92,7 @@ export default function CreatorProfilePage() {
       setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       console.error("Failed to save profile:", err)
+      setValidationError("Failed to save profile. Please try again.")
     }
   }
 

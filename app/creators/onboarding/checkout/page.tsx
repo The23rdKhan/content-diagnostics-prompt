@@ -19,22 +19,28 @@ export default function CreatorCheckout() {
   const [showCapacityGating, setShowCapacityGating] = useState(false)
   const [selectedLanguage] = useState("English") // Locked to English for MVP
   const [isReady, setIsReady] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
+
+  // State for sessionStorage values (initialized in useEffect to avoid SSR hydration mismatch)
+  const [selectedPlan, setSelectedPlan] = useState("basic")
+  const [selectedAddons, setSelectedAddons] = useState<string[]>([])
+
   const router = useRouter()
 
   // Guard: Ensure user has selected a plan before accessing checkout
+  // Also hydrate sessionStorage values on client
   useEffect(() => {
     const plan = sessionStorage.getItem("selected_plan")
+    const addons = sessionStorage.getItem("selected_addons")
+
     if (!plan) {
       router.replace("/creators/onboarding/plan")
     } else {
+      setSelectedPlan(plan)
+      setSelectedAddons(addons ? JSON.parse(addons) : [])
       setIsReady(true)
     }
   }, [router])
-
-  const selectedPlan = (typeof window !== "undefined" && sessionStorage.getItem("selected_plan")) || "basic"
-  const selectedAddons = typeof window !== "undefined"
-    ? JSON.parse(sessionStorage.getItem("selected_addons") || "[]")
-    : []
 
   const plan = CREATOR_PLANS.find((p) => p.id === selectedPlan)
   const addonsTotal = selectedAddons.length * 25
@@ -53,8 +59,10 @@ export default function CreatorCheckout() {
   }
 
   const handleCheckout = async () => {
-    if (!cardNumber) {
-      alert("Please enter card number")
+    setValidationError(null)
+
+    if (!cardNumber.trim()) {
+      setValidationError("Please enter a card number")
       return
     }
 
@@ -179,10 +187,16 @@ export default function CreatorCheckout() {
                   <Input
                     placeholder="4242 4242 4242 4242"
                     value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
+                    onChange={(e) => {
+                      setCardNumber(e.target.value)
+                      setValidationError(null)
+                    }}
                     disabled={processingPayment}
-                    className="mt-1"
+                    className={`mt-1 ${validationError ? "border-destructive" : ""}`}
                   />
+                  {validationError && (
+                    <p className="text-sm text-destructive mt-1">{validationError}</p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
