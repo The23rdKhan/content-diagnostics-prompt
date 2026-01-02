@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { captureErrorBoundary } from "@/lib/error-tracking"
 
 export default function GlobalError({
   error,
@@ -10,9 +11,7 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    // TODO: Integrate production error tracking (e.g., Sentry, LogRocket)
-    // Example: Sentry.captureException(error, { tags: { section: 'global' } })
-    console.error("Global error:", error)
+    captureErrorBoundary(error, "global")
   }, [error])
 
   return (

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertTriangle, RefreshCw, Home } from "lucide-react"
 import Link from "next/link"
+import { captureErrorBoundary } from "@/lib/error-tracking"
 
 export default function AdminError({
   error,
@@ -14,9 +15,7 @@ export default function AdminError({
   reset: () => void
 }) {
   useEffect(() => {
-    // TODO: Integrate production error tracking (e.g., Sentry, LogRocket)
-    // Example: Sentry.captureException(error, { tags: { section: 'admin' } })
-    console.error("Admin section error:", error)
+    captureErrorBoundary(error, "admin")
   }, [error])
 
   return (
