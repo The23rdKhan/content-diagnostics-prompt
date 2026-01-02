@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Play, Clock, Globe, DollarSign, Timer } from "lucide-react"
-import type { TaskDto } from "@/lib/types/api"
+import type { TaskDto, TaskStatus } from "@/lib/types/api"
 
 // Helper to format segment duration as mm:ss
 function formatDuration(seconds: number): string {
@@ -19,7 +19,7 @@ interface TaskCardProps {
   onAccept: (task: TaskDto) => void
   onResume: (task: TaskDto) => void
   onStart: (task: TaskDto) => void
-  getStatusBadge: (status: string) => React.ReactNode
+  getStatusBadge: (status: TaskStatus) => React.ReactNode
   isLocked: boolean
 }
 

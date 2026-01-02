@@ -170,13 +170,13 @@ export function TaskHistorySection() {
                 <div>
                   <p className="font-medium text-foreground">Video Review Task</p>
                   <p className="text-sm text-muted-foreground">
-                    {formatDate(task.submittedAt || task.acceptedAt)} • {task.videoDuration ? formatDuration(task.videoDuration) : "N/A"} video
+                    {formatDate(task.submittedAt || task.createdAt)} • {task.segmentDurationSeconds ? formatDuration(task.segmentDurationSeconds) : "N/A"} video
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
                 <span className={`text-sm font-medium ${normalizeStatus(task.status) === "rejected" ? "text-red-500" : "text-accent"}`}>
-                  ${(task.payout || 0).toFixed(2)}
+                  ${(task.payAmount || 0).toFixed(2)}
                 </span>
                 <span
                   className={`rounded-full px-2 py-1 text-xs font-medium ${

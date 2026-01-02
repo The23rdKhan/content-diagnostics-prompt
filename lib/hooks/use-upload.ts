@@ -144,13 +144,10 @@ export function useVideoUpload() {
 
       setState(prev => ({ ...prev, stage: "presigning", progress: 5, error: null }))
 
-      const response = await api<PresignResponse>("/storage/presign", {
-        method: "POST",
-        body: JSON.stringify({
-          type: "VIDEO",
-          fileName,
-          contentType,
-        }),
+      const response = await api.post<PresignResponse>("/storage/presign", {
+        type: "VIDEO",
+        fileName,
+        contentType,
       })
 
       setState(prev => ({ ...prev, progress: 10 }))
@@ -224,10 +221,7 @@ export function useVideoUpload() {
 
       setState(prev => ({ ...prev, stage: "creating-video", progress: 75 }))
 
-      const response = await api<VideoResponse>("/creator/videos", {
-        method: "POST",
-        body: JSON.stringify(data),
-      })
+      const response = await api.post<VideoResponse>("/creator/videos", data)
 
       setState(prev => ({ ...prev, progress: 85, videoId: response.id }))
       return response
@@ -241,10 +235,7 @@ export function useVideoUpload() {
 
       setState(prev => ({ ...prev, stage: "submitting-job", progress: 90 }))
 
-      const response = await api<JobResponse>(`/creator/videos/${videoId}/submit`, {
-        method: "POST",
-        body: JSON.stringify(data),
-      })
+      const response = await api.post<JobResponse>(`/creator/videos/${videoId}/submit`, data)
 
       setState(prev => ({
         ...prev,

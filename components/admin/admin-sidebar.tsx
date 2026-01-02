@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Gauge, ListTodo, Users, DollarSign, UserCircle, LogOut } from "lucide-react"
+import { LayoutDashboard, Gauge, ListTodo, Users, DollarSign, UserCircle, LogOut, Settings, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -14,6 +14,11 @@ const navigation = [
   { name: "Reviewers", href: "/admin/reviewers", icon: Users },
   { name: "Payouts", href: "/admin/payouts", icon: DollarSign },
   { name: "Creators", href: "/admin/creators", icon: UserCircle },
+]
+
+const accountNavigation = [
+  { name: "Profile", href: "/admin/profile", icon: User },
+  { name: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
 export function AdminSidebar() {
@@ -34,6 +39,26 @@ export function AdminSidebar() {
 
       <nav className="flex-1 space-y-1 p-4">
         {navigation.map((item) => {
+          const isActive = pathname === item.href
+          return (
+            <Link
+              key={item.name}
+              href={item.href}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+                isActive
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              }`}
+            >
+              <item.icon className="h-5 w-5" />
+              {item.name}
+            </Link>
+          )
+        })}
+
+        <div className="my-4 border-t border-border" />
+
+        {accountNavigation.map((item) => {
           const isActive = pathname === item.href
           return (
             <Link

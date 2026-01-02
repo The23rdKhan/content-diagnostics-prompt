@@ -135,10 +135,12 @@ export function ProfileDropdown({ subtitle }: ProfileDropdownProps) {
           <Settings className="mr-2 h-4 w-4" />
           Settings
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push(getBillingLink())} className="cursor-pointer">
-          <CreditCard className="mr-2 h-4 w-4" />
-          Billing
-        </DropdownMenuItem>
+        {user?.role !== "ADMIN" && (
+          <DropdownMenuItem onClick={() => router.push(getBillingLink())} className="cursor-pointer">
+            <CreditCard className="mr-2 h-4 w-4" />
+            Billing
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-destructive focus:text-destructive">
           <LogOut className="mr-2 h-4 w-4" />
