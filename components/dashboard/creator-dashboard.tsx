@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Upload, FileVideo, BarChart3, CreditCard, Plus, HelpCircle, LogOut, Menu, X, Clock } from "lucide-react"
+import { Upload, FileVideo, BarChart3, CreditCard, Plus, HelpCircle, LogOut, Menu, X, Clock, Coins } from "lucide-react"
 import { UploadSection } from "./creator/upload-section"
 import { ReviewStatusSection } from "./creator/review-status-section"
 import { ReportsSection } from "./creator/reports-section"
@@ -11,18 +12,20 @@ import { SubscriptionSection } from "./creator/subscription-section"
 import { AddonsSection } from "./creator/addons-section"
 import { BillingSection } from "./creator/billing-section"
 import { SupportSection } from "./creator/support-section"
+import { CreditsSection } from "./creator/credits-section"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { NotificationBell } from "@/components/notification-bell"
 import { ProfileDropdown } from "@/components/profile-dropdown"
 import { useAuth } from "@/lib/auth-context"
 import { LoadingScreen } from "@/components/loading-screen"
 
-type ActiveSection = "upload" | "status" | "reports" | "subscription" | "addons" | "billing" | "support"
+type ActiveSection = "upload" | "status" | "reports" | "credits" | "subscription" | "addons" | "billing" | "support"
 
 const navItems = [
   { id: "upload" as const, label: "Upload Video", icon: Upload },
   { id: "status" as const, label: "Review Status", icon: Clock },
   { id: "reports" as const, label: "Reports", icon: BarChart3 },
+  { id: "credits" as const, label: "Credits", icon: Coins },
   { id: "subscription" as const, label: "Subscription", icon: CreditCard },
   { id: "addons" as const, label: "Add-ons", icon: Plus },
   { id: "billing" as const, label: "Billing", icon: FileVideo },
@@ -33,9 +36,17 @@ export function CreatorDashboard() {
   const [activeSection, setActiveSection] = useState<ActiveSection>("upload")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user, loading } = useAuth()
+  const router = useRouter()
 
-  // Show loading state while auth is bootstrapping
-  if (loading) {
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/sign-in")
+    }
+  }, [loading, user, router])
+
+  // Show loading state while auth is bootstrapping or redirecting
+  if (loading || !user) {
     return <LoadingScreen />
   }
 
@@ -54,6 +65,8 @@ export function CreatorDashboard() {
         return <ReviewStatusSection />
       case "reports":
         return <ReportsSection />
+      case "credits":
+        return <CreditsSection />
       case "subscription":
         return <SubscriptionSection />
       case "addons":

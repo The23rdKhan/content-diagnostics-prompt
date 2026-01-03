@@ -22,30 +22,23 @@ export default function CreatorCheckout() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
-
-  // State for sessionStorage values (initialized in useEffect to avoid SSR hydration mismatch)
   const [selectedPlan, setSelectedPlan] = useState("basic")
-  const [selectedAddons, setSelectedAddons] = useState<string[]>([])
 
   const router = useRouter()
 
   // Guard: Ensure user has selected a plan before accessing checkout
   useEffect(() => {
     const plan = sessionStorage.getItem("selected_plan")
-    const addons = sessionStorage.getItem("selected_addons")
 
     if (!plan) {
       router.replace("/creators/onboarding/plan")
     } else {
       setSelectedPlan(plan)
-      setSelectedAddons(addons ? JSON.parse(addons) : [])
       setIsReady(true)
     }
   }, [router])
 
   const plan = CREATOR_PLANS.find((p) => p.id === selectedPlan)
-  const addonsTotal = selectedAddons.length * 25
-  const total = (plan?.price || 49) + addonsTotal
 
   // Don't render until we've verified the prerequisite step was completed
   if (!isReady) {
@@ -56,7 +49,7 @@ export default function CreatorCheckout() {
     setError(null)
     setIsProcessing(true)
 
-    trackEvent("checkout_started", { plan: selectedPlan, total })
+    trackEvent("checkout_started", { plan: selectedPlan, total: plan?.price })
 
     try {
       const response = await api.post<CheckoutSessionResponse>(
@@ -136,23 +129,6 @@ export default function CreatorCheckout() {
                   <div className="text-xl font-bold text-accent mt-2">${plan?.price}/mo</div>
                 </div>
 
-                {selectedAddons.length > 0 && (
-                  <div className="pt-4 border-t border-border">
-                    <h4 className="font-semibold mb-2">Add-ons</h4>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Add-ons will be available for purchase from your dashboard after subscription.
-                    </p>
-                    <div className="space-y-2">
-                      {selectedAddons.map((addon: string) => (
-                        <div key={addon} className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">{addon}</span>
-                          <span className="text-muted-foreground">Coming soon</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 <div className="pt-4 border-t border-border flex justify-between">
                   <span className="font-semibold">Monthly Total</span>
                   <span className="text-xl font-bold text-accent">${plan?.price}/mo</span>
@@ -170,6 +146,12 @@ export default function CreatorCheckout() {
                     <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">MVP supports English only</p>
+                </div>
+
+                <div className="pt-4 border-t border-border">
+                  <p className="text-xs text-muted-foreground">
+                    Add-ons like extra reviewers or faster delivery can be purchased when you submit each video.
+                  </p>
                 </div>
               </CardContent>
             </Card>

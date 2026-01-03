@@ -3,6 +3,7 @@ package com.contentdiagnostics.jobs.service;
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.common.exception.BadRequestException;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
+import com.contentdiagnostics.credits.service.CreditService;
 import com.contentdiagnostics.jobs.dto.JobDto;
 import com.contentdiagnostics.jobs.dto.SubmitVideoRequest;
 import com.contentdiagnostics.jobs.entity.Job;
@@ -36,6 +37,7 @@ public class JobService {
     private final VideoRepository videoRepository;
     private final ReportRepository reportRepository;
     private final TaskCreationService taskCreationService;
+    private final CreditService creditService;
 
     /**
      * Get all jobs for a creator.
@@ -57,6 +59,9 @@ public class JobService {
         if (video.getStatus() != VideoStatus.READY && video.getStatus() != VideoStatus.UPLOADED) {
             throw new BadRequestException("Video is not ready for review submission", "VIDEO_NOT_READY");
         }
+
+        // Deduct credits atomically FIRST - this will throw if insufficient credits
+        int creditsRequired = CreditService.CREDITS_PER_VIDEO;
 
         // Determine SLA hours based on add-ons
         int slaHours = 48; // Default
@@ -85,6 +90,17 @@ public class JobService {
         job = jobRepository.save(job);
 
         log.info("Job {} created for video {} by creator {}", job.getId(), videoId, creator.getId());
+
+        // Deduct credits atomically - throws BadRequestException if insufficient
+        try {
+            creditService.deductCreditsForVideo(creator, job.getId(), creditsRequired);
+            log.info("Deducted {} credits for job {}", creditsRequired, job.getId());
+        } catch (Exception e) {
+            // If credit deduction fails, delete the job and re-throw
+            log.error("Failed to deduct credits for job {}, rolling back job creation", job.getId());
+            jobRepository.delete(job);
+            throw e;
+        }
 
         // Create tasks for reviewers
         taskCreationService.createTasksForJob(job, video);

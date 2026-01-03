@@ -10,6 +10,7 @@ import com.contentdiagnostics.common.exception.BadRequestException;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
+import com.contentdiagnostics.credits.service.CreditService;
 import com.stripe.Stripe;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
@@ -38,6 +39,7 @@ public class StripeService {
 
     private final StripeEventRepository stripeEventRepository;
     private final CreatorProfileRepository creatorProfileRepository;
+    private final CreditService creditService;
 
     @Value("${stripe.secret-key:}")
     private String stripeSecretKey;
@@ -283,9 +285,17 @@ public class StripeService {
         if (session == null) return;
 
         String customerId = session.getCustomer();
-        String subscriptionId = session.getSubscription();
         Map<String, String> metadata = session.getMetadata();
 
+        // Check if this is a credit purchase
+        String purchaseType = metadata.get("purchase_type");
+        if ("credits".equals(purchaseType)) {
+            handleCreditPurchase(session, customerId, metadata);
+            return;
+        }
+
+        // Handle subscription checkout
+        String subscriptionId = session.getSubscription();
         String planTier = metadata.get("plan_tier");
 
         creatorProfileRepository.findByStripeCustomerId(customerId).ifPresent(profile -> {
@@ -294,6 +304,41 @@ public class StripeService {
             creatorProfileRepository.save(profile);
             log.info("Updated subscription for profile {}: {}", profile.getId(), planTier);
         });
+    }
+
+    private void handleCreditPurchase(Session session, String customerId, Map<String, String> metadata) {
+        String bundleId = metadata.get("bundle_id");
+        String paymentIntentId = session.getPaymentIntent();
+
+        if (paymentIntentId == null || paymentIntentId.isEmpty()) {
+            log.error("Credit purchase webhook missing payment intent ID for session {}", session.getId());
+            return;
+        }
+
+        // Idempotency check - ensure we don't process the same payment twice
+        if (creditService.isPaymentAlreadyProcessed(paymentIntentId)) {
+            log.info("Credit purchase for payment {} already processed, skipping", paymentIntentId);
+            return;
+        }
+
+        creatorProfileRepository.findByStripeCustomerId(customerId).ifPresentOrElse(
+            profile -> {
+                com.contentdiagnostics.credits.entity.CreditBundle bundle =
+                        com.contentdiagnostics.credits.entity.CreditBundle.findById(bundleId);
+                if (bundle != null) {
+                    creditService.addPurchasedCredits(profile, bundleId, paymentIntentId, bundle.getPrice());
+                    log.info("Added {} credits from bundle {} for profile {}",
+                            bundle.getCredits(), bundleId, profile.getId());
+                } else {
+                    log.error("Unknown bundle ID {} in credit purchase webhook", bundleId);
+                    throw new RuntimeException("Unknown bundle ID: " + bundleId);
+                }
+            },
+            () -> {
+                log.error("No profile found for Stripe customer {} in credit purchase webhook", customerId);
+                throw new RuntimeException("Profile not found for customer: " + customerId);
+            }
+        );
     }
 
     private void handleSubscriptionUpdated(Event event) {

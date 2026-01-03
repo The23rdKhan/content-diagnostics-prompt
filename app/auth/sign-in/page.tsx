@@ -15,7 +15,7 @@ export default function SignInPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { signIn, user } = useAuth()
+  const { signIn, user, loading } = useAuth()
   const router = useRouter()
 
   const handleSignIn = async () => {
@@ -52,7 +52,8 @@ export default function SignInPage() {
 
   // Redirect after successful sign-in based on role
   useEffect(() => {
-    if (user) {
+    // Wait for auth to finish loading before redirecting
+    if (!loading && user) {
       const redirectPath =
         user.role === "ADMIN"
           ? "/admin/dashboard"
@@ -61,10 +62,10 @@ export default function SignInPage() {
             : "/creators/dashboard"
       router.push(redirectPath)
     }
-  }, [user, router])
+  }, [user, loading, router])
 
-  // Show nothing while redirecting
-  if (user) {
+  // Show loading or nothing while checking auth/redirecting
+  if (loading || user) {
     return null
   }
 

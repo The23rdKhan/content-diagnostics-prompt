@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Plus, Users, Zap, FileText, Video, AlertCircle, RefreshCw, Package } from "lucide-react"
+import { Users, Zap, FileText, Video, AlertCircle, RefreshCw, Package } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { useAvailableAddons, useActiveAddons, type Addon, type ActiveAddon } from "@/lib/hooks/use-addons"
@@ -152,10 +152,7 @@ export function AddonsSection() {
               </div>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-sm font-medium text-accent">{addon.priceDisplay}</span>
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
+                <span className="text-xs text-muted-foreground">Select during upload</span>
               </div>
             </div>
           )

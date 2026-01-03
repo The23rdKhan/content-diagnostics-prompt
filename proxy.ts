@@ -1,25 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+/**
+ * Next.js Middleware Proxy
+ *
+ * Note: We cannot check auth status here because:
+ * 1. The refresh token is HttpOnly (not accessible in JS/middleware)
+ * 2. The cookie path is /api/auth (not sent to other routes)
+ * 3. The access token is in-memory only (not persisted)
+ *
+ * Auth protection is handled client-side by the AuthProvider.
+ * Dashboard pages redirect to sign-in when no user is authenticated.
+ */
 export function proxy(request: NextRequest) {
-  const authUser = request.cookies.get("auth_user")?.value
-
-  if (!authUser && request.nextUrl.pathname.startsWith("/admin")) {
-    return NextResponse.redirect(new URL("/auth/sign-in", request.url))
-  }
-
-  // Redirect unauthenticated users trying to access protected routes
-  if (
-    !authUser &&
-    (request.nextUrl.pathname.startsWith("/creators") || request.nextUrl.pathname.startsWith("/reviewers"))
-  ) {
-    if (
-      !request.nextUrl.pathname.startsWith("/creators/dashboard") &&
-      !request.nextUrl.pathname.startsWith("/reviewers/dashboard")
-    ) {
-      return NextResponse.redirect(new URL("/auth/sign-in", request.url))
-    }
-  }
-
+  // Currently just passes through - auth is handled client-side
   return NextResponse.next()
 }
 

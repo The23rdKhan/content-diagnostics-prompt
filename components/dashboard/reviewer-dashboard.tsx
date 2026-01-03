@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Play, History, DollarSign, CreditCard, Globe, HelpCircle, LogOut, Menu, X } from "lucide-react"
 import { TaskQueueSection } from "./reviewer/task-queue-section"
@@ -31,9 +32,17 @@ export function ReviewerDashboard() {
   const [activeSection, setActiveSection] = useState<ActiveSection>("queue")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user, loading } = useAuth()
+  const router = useRouter()
 
-  // Show loading state while auth is bootstrapping
-  if (loading) {
+  // Redirect to sign-in if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/sign-in")
+    }
+  }, [loading, user, router])
+
+  // Show loading state while auth is bootstrapping or redirecting
+  if (loading || !user) {
     return <LoadingScreen />
   }
 

@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileVideo, X, CheckCircle, ChevronRight, ChevronLeft, AlertCircle, RefreshCw } from "lucide-react"
+import { Upload, FileVideo, X, CheckCircle, ChevronRight, ChevronLeft, AlertCircle, RefreshCw, Coins, Loader2 } from "lucide-react"
 import { trackEvent } from "@/lib/analytics"
 import { CapacityGatingModal, type CapacityOption } from "@/components/creator/capacity-gating-modal"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useVideoUpload } from "@/lib/hooks/use-upload"
+import { useCreditBalance, useCreditBundles, usePurchaseCredits } from "@/lib/hooks/use-credits"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 type UploadStep = "select-file" | "video-details" | "capacity-review" | "add-ons" | "submit"
 
@@ -30,9 +32,18 @@ export function UploadSection() {
   const [currentStep, setCurrentStep] = useState<UploadStep>("select-file")
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [showBuyCreditsModal, setShowBuyCreditsModal] = useState(false)
+  const [selectedBundle, setSelectedBundle] = useState<string | null>(null)
 
   // Upload hook
   const { state: uploadState, uploadVideo, retry, reset: resetUpload } = useVideoUpload()
+
+  // Credit hooks
+  const { balance: creditBalance, creditsPerVideo, loading: creditsLoading, refetch: refetchCredits } = useCreditBalance()
+  const { bundles, loading: bundlesLoading } = useCreditBundles()
+  const { purchaseCredits, loading: purchasing } = usePurchaseCredits()
+
+  const hasEnoughCredits = creditBalance >= creditsPerVideo
 
   // Form state
   const [videoTitle, setVideoTitle] = useState("")
@@ -172,6 +183,22 @@ export function UploadSection() {
   const handleAddonToggle = (addon: keyof typeof addons, value: any) => {
     setAddons((prev) => ({ ...prev, [addon]: value }))
     trackEvent("creator_addon_selected", { addon, value })
+  }
+
+  const handleBuyCredits = async (bundleId: string) => {
+    try {
+      await purchaseCredits(bundleId)
+      setShowBuyCreditsModal(false)
+    } catch (err) {
+      logError("Failed to purchase credits", err)
+    }
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount)
   }
 
   const handleUpload = async () => {
@@ -601,12 +628,41 @@ export function UploadSection() {
 
         return (
           <div className="space-y-4">
-            <Alert className="border-accent/30 bg-accent/5">
-              <AlertCircle className="h-4 w-4 text-accent" />
-              <AlertDescription>Internal testing only. Not representative of public performance.</AlertDescription>
-            </Alert>
+            {/* Credit Balance Display */}
+            <div className={`rounded-lg border p-4 ${hasEnoughCredits ? 'border-accent/30 bg-accent/5' : 'border-destructive bg-destructive/5'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Coins className={`h-5 w-5 ${hasEnoughCredits ? 'text-accent' : 'text-destructive'}`} />
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {creditsLoading ? 'Loading...' : `${creditBalance} credits available`}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {creditsPerVideo} credits required for this submission
+                    </p>
+                  </div>
+                </div>
+                {!hasEnoughCredits && !creditsLoading && (
+                  <Button size="sm" onClick={() => setShowBuyCreditsModal(true)}>
+                    <Coins className="mr-2 h-4 w-4" />
+                    Buy Credits
+                  </Button>
+                )}
+              </div>
+            </div>
 
-            {!uploadError && !uploadComplete && (
+            {/* Insufficient Credits Warning */}
+            {!hasEnoughCredits && !creditsLoading && (
+              <Alert className="border-destructive bg-destructive/5">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                <AlertDescription className="text-destructive">
+                  You need {creditsPerVideo - creditBalance} more credits to submit this video.
+                  Purchase credits to continue.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {hasEnoughCredits && !uploadError && !uploadComplete && (
               <Alert>
                 <CheckCircle className="h-4 w-4 text-accent" />
                 <AlertDescription>Review your submission details before uploading</AlertDescription>
@@ -711,10 +767,18 @@ export function UploadSection() {
                 </Button>
               )}
 
-              {/* Idle: Show Submit button */}
-              {!isUploading && !uploadComplete && !uploadError && (
+              {/* Idle: Show Submit button or Buy Credits if insufficient */}
+              {!isUploading && !uploadComplete && !uploadError && hasEnoughCredits && (
                 <Button onClick={handleUpload} className="flex-1">
                   Submit Job
+                </Button>
+              )}
+
+              {/* Not enough credits: Show Buy Credits button */}
+              {!isUploading && !uploadComplete && !uploadError && !hasEnoughCredits && (
+                <Button onClick={() => setShowBuyCreditsModal(true)} className="flex-1">
+                  <Coins className="mr-2 h-4 w-4" />
+                  Buy Credits to Submit
                 </Button>
               )}
 
@@ -797,6 +861,67 @@ export function UploadSection() {
         onClose={() => setShowCapacityModal(false)}
         onSelect={handleCapacitySelect}
       />
+
+      {/* Buy Credits Modal */}
+      <Dialog open={showBuyCreditsModal} onOpenChange={setShowBuyCreditsModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Purchase Credits</DialogTitle>
+            <DialogDescription>
+              You need {creditsPerVideo} credits to submit a video. Choose a bundle below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 md:grid-cols-2 mt-4">
+            {bundles.map((bundle) => (
+              <div
+                key={bundle.id}
+                className={`relative rounded-lg border-2 p-4 cursor-pointer transition-all hover:border-accent/50 ${
+                  selectedBundle === bundle.id
+                    ? "border-accent bg-accent/5"
+                    : "border-border"
+                }`}
+                onClick={() => setSelectedBundle(bundle.id)}
+              >
+                {bundle.popular && (
+                  <span className="absolute -top-2 -right-2 rounded bg-accent px-2 py-0.5 text-xs text-white">
+                    Popular
+                  </span>
+                )}
+                <h3 className="font-semibold text-foreground">{bundle.name}</h3>
+                <p className="text-2xl font-bold text-accent mt-1">{bundle.credits} credits</p>
+                <p className="text-sm text-muted-foreground">{bundle.description}</p>
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-lg font-semibold">{formatCurrency(bundle.price)}</span>
+                  {bundle.savingsPercent > 0 && (
+                    <span className="text-xs text-green-600">Save {bundle.savingsPercent}%</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowBuyCreditsModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => selectedBundle && handleBuyCredits(selectedBundle)}
+              disabled={!selectedBundle || purchasing}
+            >
+              {purchasing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Coins className="mr-2 h-4 w-4" />
+                  Purchase Credits
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
