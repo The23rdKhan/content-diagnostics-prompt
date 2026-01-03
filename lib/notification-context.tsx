@@ -81,15 +81,63 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Initial fetch
+  // Polling with idle detection and tab visibility
   useEffect(() => {
-    fetchNotifications()
-  }, [fetchNotifications])
+    let interval: NodeJS.Timeout | null = null
+    let idleTimeout: NodeJS.Timeout | null = null
+    const POLL_INTERVAL = 60000 // 60 seconds
+    const IDLE_THRESHOLD = 5 * 60 * 1000 // 5 minutes of inactivity
 
-  // Poll for new notifications every 60 seconds
-  useEffect(() => {
-    const interval = setInterval(fetchNotifications, 60000)
-    return () => clearInterval(interval)
+    const startPolling = () => {
+      if (!interval) {
+        interval = setInterval(fetchNotifications, POLL_INTERVAL)
+      }
+    }
+
+    const stopPolling = () => {
+      if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
+    }
+
+    const resetIdleTimer = () => {
+      if (idleTimeout) clearTimeout(idleTimeout)
+      idleTimeout = setTimeout(stopPolling, IDLE_THRESHOLD)
+      startPolling()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling()
+        if (idleTimeout) clearTimeout(idleTimeout)
+      } else {
+        fetchNotifications() // Fetch immediately when tab becomes visible
+        resetIdleTimer()
+      }
+    }
+
+    // Initial fetch
+    fetchNotifications()
+
+    // Start polling and set up listeners
+    startPolling()
+    resetIdleTimer()
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("mousemove", resetIdleTimer)
+    window.addEventListener("keydown", resetIdleTimer)
+    window.addEventListener("click", resetIdleTimer)
+    window.addEventListener("scroll", resetIdleTimer)
+
+    return () => {
+      stopPolling()
+      if (idleTimeout) clearTimeout(idleTimeout)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("mousemove", resetIdleTimer)
+      window.removeEventListener("keydown", resetIdleTimer)
+      window.removeEventListener("click", resetIdleTimer)
+      window.removeEventListener("scroll", resetIdleTimer)
+    }
   }, [fetchNotifications])
 
   const markAsRead = useCallback(async (id: string) => {
