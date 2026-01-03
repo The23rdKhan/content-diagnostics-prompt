@@ -47,5 +47,6 @@ public class TaskDto {
         private String question;
         private String type; // "scale", "choice", "text", "attention-check"
         private List<String> options;
+        private String correctAnswer; // Expected answer for attention check questions
     }
 }

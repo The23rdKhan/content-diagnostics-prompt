@@ -3,9 +3,11 @@ package com.contentdiagnostics.workers.publisher;
 import com.contentdiagnostics.common.config.CorrelationIdFilter;
 import com.contentdiagnostics.jobs.entity.Job;
 import com.contentdiagnostics.tasks.entity.Task;
+import com.contentdiagnostics.videos.entity.Video;
 import com.contentdiagnostics.workers.config.SqsConfig;
 import com.contentdiagnostics.workers.event.QcEvent;
 import com.contentdiagnostics.workers.event.ReportCompilationEvent;
+import com.contentdiagnostics.workers.event.VideoProcessingEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -72,6 +74,27 @@ public class SqsPublisher {
                 .build();
 
         return publishEvent(sqsConfig.getReportCompilationQueue(), event, "REPORT_COMPILATION_EVENT");
+    }
+
+    /**
+     * Publishes a video processing event after upload completes.
+     *
+     * @param video The video to process
+     * @return The SQS message ID, or null if publishing failed
+     */
+    public String publishVideoProcessingEvent(Video video) {
+        if (sqsConfig.getVideoProcessingQueue() == null || sqsConfig.getVideoProcessingQueue().isEmpty()) {
+            log.warn("Video processing queue URL not configured, skipping event publish for video {}", video.getId());
+            return null;
+        }
+
+        VideoProcessingEvent event = VideoProcessingEvent.builder()
+                .videoId(video.getId())
+                .storageKey(video.getStorageKey())
+                .eventType("UPLOADED")
+                .build();
+
+        return publishEvent(sqsConfig.getVideoProcessingQueue(), event, "VIDEO_PROCESSING_EVENT");
     }
 
     /**

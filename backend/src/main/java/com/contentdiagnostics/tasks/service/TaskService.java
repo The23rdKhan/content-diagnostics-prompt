@@ -335,12 +335,34 @@ public class TaskService {
             var answers = objectMapper.readValue(task.getAnswersJson(),
                     new TypeReference<java.util.Map<String, Object>>() {});
 
-            // TODO: Implement actual attention check validation
-            // For now, just check if the question was answered
-            return answers.containsKey(attentionQuestion.getId());
+            // Get user's answer for this question
+            Object userAnswerObj = answers.get(attentionQuestion.getId());
+            if (userAnswerObj == null) {
+                log.warn("Attention check question {} not answered for task {}",
+                        attentionQuestion.getId(), task.getId());
+                return false;
+            }
+
+            String userAnswer = String.valueOf(userAnswerObj).trim();
+
+            // Get expected answer - use correctAnswer field, default to "Blue" for legacy questions
+            String expectedAnswer = attentionQuestion.getCorrectAnswer();
+            if (expectedAnswer == null || expectedAnswer.isEmpty()) {
+                expectedAnswer = "Blue"; // Default for attention check questions
+            }
+
+            // Compare answers (case-insensitive)
+            boolean passed = expectedAnswer.equalsIgnoreCase(userAnswer);
+
+            if (!passed) {
+                log.info("Attention check failed for task {}: expected '{}', got '{}'",
+                        task.getId(), expectedAnswer, userAnswer);
+            }
+
+            return passed;
         } catch (Exception e) {
             log.error("Error checking attention check for task {}", task.getId(), e);
-            return true; // Don't fail on parsing errors
+            return false; // Fail safely - require manual review on errors
         }
     }
 

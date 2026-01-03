@@ -7,6 +7,7 @@ import com.contentdiagnostics.videos.dto.VideoDto;
 import com.contentdiagnostics.videos.entity.Video;
 import com.contentdiagnostics.videos.entity.VideoStatus;
 import com.contentdiagnostics.videos.repository.VideoRepository;
+import com.contentdiagnostics.workers.publisher.SqsPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 public class VideoService {
 
     private final VideoRepository videoRepository;
+    private final SqsPublisher sqsPublisher;
 
     /**
      * Create a new video record.
@@ -80,7 +82,8 @@ public class VideoService {
 
         log.info("Video {} marked as uploaded", videoId);
 
-        // TODO: Trigger video processing via SQS
+        // Trigger video processing via SQS
+        sqsPublisher.publishVideoProcessingEvent(video);
 
         return mapToDto(video);
     }

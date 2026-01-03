@@ -3,6 +3,7 @@ package com.contentdiagnostics.reviewers.service;
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.common.exception.BadRequestException;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
+import com.contentdiagnostics.reviewers.config.QualificationConfig;
 import com.contentdiagnostics.reviewers.dto.*;
 import com.contentdiagnostics.reviewers.entity.ReviewerProfile;
 import com.contentdiagnostics.reviewers.repository.ReviewerProfileRepository;
@@ -22,6 +23,7 @@ import java.util.List;
 public class ReviewerService {
 
     private final ReviewerProfileRepository profileRepository;
+    private final QualificationConfig qualificationConfig;
 
     /**
      * Get reviewer profile.
@@ -125,11 +127,20 @@ public class ReviewerService {
     }
 
     private boolean evaluateQualification(QualificationSubmissionRequest request) {
-        // TODO: Implement proper qualification evaluation
-        // For MVP: pass if answers provided and completion time is reasonable
-        return request.getAnswers() != null
-                && !request.getAnswers().isEmpty()
-                && (request.getCompletionTimeSeconds() == null || request.getCompletionTimeSeconds() >= 30);
+        if (request.getAnswers() == null || request.getAnswers().isEmpty()) {
+            log.warn("Qualification submission has no answers");
+            return false;
+        }
+
+        boolean passed = qualificationConfig.evaluate(
+                request.getAnswers(),
+                request.getCompletionTimeSeconds()
+        );
+
+        log.info("Qualification evaluation: passed={}, completionTime={}s, answersCount={}",
+                passed, request.getCompletionTimeSeconds(), request.getAnswers().size());
+
+        return passed;
     }
 
     private ReviewerProfileDto mapToDto(ReviewerProfile profile, String email) {
