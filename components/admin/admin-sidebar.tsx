@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, Gauge, ListTodo, Users, DollarSign, UserCircle, LogOut, Settings, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
@@ -23,7 +23,13 @@ const accountNavigation = [
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const { user, signOut } = useAuth()
+
+  const handleSignOut = async () => {
+    await signOut()
+    router.push("/")
+  }
 
   return (
     <div className="flex h-screen w-64 flex-col border-r border-border bg-background">
@@ -92,7 +98,7 @@ export function AdminSidebar() {
           </div>
           <ThemeToggle />
         </div>
-        <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" onClick={signOut}>
+        <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign Out
         </Button>

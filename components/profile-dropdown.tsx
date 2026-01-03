@@ -23,7 +23,7 @@ export function ProfileDropdown({ subtitle }: ProfileDropdownProps) {
 
   const handleSignOut = async () => {
     await signOut()
-    router.push("/auth/sign-in")
+    router.push("/")
   }
 
   // Get the profile based on user role
