@@ -45,6 +45,9 @@ public class JobDto {
     private Instant createdAt;
     private Instant deliveredAt;
 
+    // Report reference (populated when job is delivered)
+    private Long reportId;
+
     @Data
     @Builder
     @NoArgsConstructor

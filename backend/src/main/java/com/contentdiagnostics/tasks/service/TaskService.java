@@ -4,8 +4,12 @@ import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.common.exception.BadRequestException;
 import com.contentdiagnostics.common.exception.ForbiddenException;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
+import com.contentdiagnostics.jobs.entity.Job;
+import com.contentdiagnostics.jobs.entity.JobStatus;
 import com.contentdiagnostics.jobs.repository.JobRepository;
+import com.contentdiagnostics.reports.service.ReportCompilationService;
 import com.contentdiagnostics.reviewers.entity.ReviewerProfile;
+import com.contentdiagnostics.workers.publisher.SqsPublisher;
 import com.contentdiagnostics.reviewers.repository.ReviewerProfileRepository;
 import com.contentdiagnostics.tasks.dto.TaskDto;
 import com.contentdiagnostics.tasks.dto.TaskHistoryResponse;
@@ -41,6 +45,8 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final ReviewerProfileRepository reviewerProfileRepository;
     private final JobRepository jobRepository;
+    private final ReportCompilationService reportCompilationService;
+    private final SqsPublisher sqsPublisher;
     private final ObjectMapper objectMapper;
 
     @Value("${app.task.lease-duration-minutes:10}")
@@ -169,10 +175,13 @@ public class TaskService {
 
         log.info("Task {} submitted by reviewer {}", taskId, reviewer.getId());
 
-        // Trigger async QC processing
-        // TODO: Send to QC queue
+        // Get the updated task for QC event
+        Task updatedTask = taskRepository.findById(taskId).orElseThrow();
 
-        return mapToDto(taskRepository.findById(taskId).orElseThrow());
+        // Trigger async QC processing via SQS
+        sqsPublisher.publishQcEvent(updatedTask);
+
+        return mapToDto(updatedTask);
     }
 
     /**
@@ -231,7 +240,42 @@ public class TaskService {
             log.info("Task {} rejected: {}", taskId, rejectionReason);
         }
 
-        // TODO: Check if job is complete and trigger report compilation
+        // Check if job is complete and trigger report compilation
+        checkJobCompletionAndCompileReport(task.getJob());
+    }
+
+    /**
+     * Checks if all tasks for a job are processed and triggers report compilation.
+     */
+    private void checkJobCompletionAndCompileReport(Job job) {
+        long approvedCount = taskRepository.countByJobAndStatus(job, TaskStatus.APPROVED);
+        long rejectedCount = taskRepository.countByJobAndStatus(job, TaskStatus.REJECTED);
+        long totalProcessed = approvedCount + rejectedCount;
+        int requiredReviewers = job.getRequiredReviewers();
+
+        log.debug("Job {} progress: {}/{} tasks processed ({} approved, {} rejected)",
+                job.getId(), totalProcessed, requiredReviewers, approvedCount, rejectedCount);
+
+        // Check if all tasks have been processed
+        if (totalProcessed >= requiredReviewers) {
+            log.info("Job {} is complete with {} approved and {} rejected tasks",
+                    job.getId(), approvedCount, rejectedCount);
+
+            // Update job status
+            job.setStatus(JobStatus.COMPILING);
+            job.setHumanReviewComplete(true);
+            jobRepository.save(job);
+
+            // Compile the report
+            try {
+                reportCompilationService.compileReport(job);
+                log.info("Report compiled for job {}", job.getId());
+            } catch (Exception e) {
+                log.error("Failed to compile report for job {}", job.getId(), e);
+                job.setStatus(JobStatus.FAILED);
+                jobRepository.save(job);
+            }
+        }
     }
 
     /**

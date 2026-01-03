@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { X, Play, AlertCircle } from "lucide-react"
 import type { TaskDto } from "@/lib/types/api"
-import Image from "next/image"
 
 // Helper to format segment duration as mm:ss
 function formatDuration(seconds: number): string {
@@ -24,16 +23,18 @@ export function TaskCompletionModal({ task, onClose, onSubmit }: TaskCompletionM
   const [watchTime, setWatchTime] = useState(0)
   const [canSubmit, setCanSubmit] = useState(false)
   const [videoStarted, setVideoStarted] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
-  useEffect(() => {
-    if (!videoStarted) return
+  // Track actual video watch time
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setWatchTime(Math.floor(videoRef.current.currentTime))
+    }
+  }
 
-    const interval = setInterval(() => {
-      setWatchTime((prev) => prev + 1)
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [videoStarted])
+  const handlePlay = () => {
+    setVideoStarted(true)
+  }
 
   useEffect(() => {
     const minWatchTime = task.segmentDurationSeconds * 0.7
@@ -74,28 +75,17 @@ export function TaskCompletionModal({ task, onClose, onSubmit }: TaskCompletionM
           <div>
             <div className="aspect-video rounded-lg bg-secondary flex items-center justify-center overflow-hidden relative">
               {task.videoSegmentUrl ? (
-                <>
-                  <Image src={task.videoSegmentUrl || "/placeholder.svg"} alt="Video segment" fill className="object-cover" />
-                  {!videoStarted && (
-                    <button
-                      onClick={() => setVideoStarted(true)}
-                      className="absolute inset-0 flex items-center justify-center bg-black/50 hover:bg-black/60 transition-colors"
-                    >
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="h-16 w-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                          <Play className="h-8 w-8 text-white ml-1" />
-                        </div>
-                        <span className="text-white text-sm font-medium">Click to start video</span>
-                      </div>
-                    </button>
-                  )}
-                  {videoStarted && (
-                    <div className="absolute bottom-4 right-4 rounded-lg bg-black/70 px-3 py-1.5 text-sm text-white font-medium">
-                      {Math.floor(watchTime / 60)}:{(watchTime % 60).toString().padStart(2, "0")} /{" "}
-                      {formatDuration(task.segmentDurationSeconds)}
-                    </div>
-                  )}
-                </>
+                <video
+                  ref={videoRef}
+                  src={task.videoSegmentUrl}
+                  controls
+                  onPlay={handlePlay}
+                  onTimeUpdate={handleTimeUpdate}
+                  className="w-full h-full object-contain"
+                  controlsList="nodownload"
+                >
+                  Your browser does not support the video tag.
+                </video>
               ) : (
                 <div className="text-center">
                   <Play className="mx-auto h-12 w-12 text-muted-foreground" />

@@ -256,6 +256,7 @@ export interface JobDto {
   estimatedDeliveryWindow?: string
   createdAt: string
   deliveredAt?: string
+  reportId?: number
 }
 
 // =============================================================================

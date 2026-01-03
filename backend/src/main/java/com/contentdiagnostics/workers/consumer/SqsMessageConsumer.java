@@ -1,10 +1,15 @@
 package com.contentdiagnostics.workers.consumer;
 
 import com.contentdiagnostics.common.config.CorrelationIdFilter;
+import com.contentdiagnostics.common.exception.ResourceNotFoundException;
+import com.contentdiagnostics.jobs.entity.Job;
+import com.contentdiagnostics.jobs.repository.JobRepository;
+import com.contentdiagnostics.reports.service.ReportCompilationService;
 import com.contentdiagnostics.tasks.service.TaskService;
 import com.contentdiagnostics.workers.config.SqsConfig;
 import com.contentdiagnostics.workers.entity.SqsProcessedMessage;
 import com.contentdiagnostics.workers.event.QcEvent;
+import com.contentdiagnostics.workers.event.ReportCompilationEvent;
 import com.contentdiagnostics.workers.repository.SqsProcessedMessageRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -38,11 +43,14 @@ import java.util.UUID;
 public class SqsMessageConsumer {
 
     private static final String QC_QUEUE_NAME = "qc-queue";
+    private static final String REPORT_COMPILATION_QUEUE_NAME = "report-compilation-queue";
     private static final int MAX_RETRIES = 3;
 
     private final SqsClient sqsClient;
     private final SqsConfig sqsConfig;
     private final TaskService taskService;
+    private final ReportCompilationService reportCompilationService;
+    private final JobRepository jobRepository;
     private final ObjectMapper objectMapper;
     private final SqsProcessedMessageRepository processedMessageRepository;
 
@@ -71,6 +79,78 @@ public class SqsMessageConsumer {
             }
         } catch (Exception e) {
             log.error("Error polling QC queue", e);
+        }
+    }
+
+    /**
+     * Poll report compilation queue for generating reports.
+     * Runs every 10 seconds with idempotent processing.
+     */
+    @Scheduled(fixedDelay = 10000)
+    public void pollReportCompilationQueue() {
+        if (sqsConfig.getReportCompilationQueue() == null || sqsConfig.getReportCompilationQueue().isEmpty()) {
+            return;
+        }
+
+        try {
+            ReceiveMessageRequest request = ReceiveMessageRequest.builder()
+                    .queueUrl(sqsConfig.getReportCompilationQueue())
+                    .maxNumberOfMessages(5)
+                    .waitTimeSeconds(5)
+                    .messageAttributeNames("correlationId", "messageType")
+                    .build();
+
+            List<Message> messages = sqsClient.receiveMessage(request).messages();
+
+            for (Message message : messages) {
+                processReportCompilationMessage(message);
+            }
+        } catch (Exception e) {
+            log.error("Error polling report compilation queue", e);
+        }
+    }
+
+    /**
+     * Process a report compilation message.
+     */
+    private void processReportCompilationMessage(Message message) {
+        String messageId = message.messageId();
+        String correlationId = extractCorrelationId(message);
+
+        try {
+            MDC.put(CorrelationIdFilter.CORRELATION_ID_MDC_KEY, correlationId);
+            MDC.put("sqsMessageId", messageId);
+            MDC.put("sqsQueue", REPORT_COMPILATION_QUEUE_NAME);
+
+            // Check if already processed
+            if (processedMessageRepository.existsByMessageIdAndQueueName(messageId, REPORT_COMPILATION_QUEUE_NAME)) {
+                log.info("Report compilation message already processed, skipping: {}", messageId);
+                deleteMessage(sqsConfig.getReportCompilationQueue(), message.receiptHandle());
+                return;
+            }
+
+            // Parse and process
+            ReportCompilationEvent event = objectMapper.readValue(message.body(), ReportCompilationEvent.class);
+            log.info("Processing report compilation for job {}", event.getJobId());
+
+            Job job = jobRepository.findById(event.getJobId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Job", event.getJobId().toString()));
+
+            reportCompilationService.compileReport(job);
+
+            // Record success
+            recordProcessedMessage(messageId, REPORT_COMPILATION_QUEUE_NAME, "REPORT_COMPILATION_EVENT", "SUCCESS", null);
+            deleteMessage(sqsConfig.getReportCompilationQueue(), message.receiptHandle());
+
+            log.info("Successfully compiled report for job {}", event.getJobId());
+
+        } catch (Exception e) {
+            log.error("Error processing report compilation message: {}", messageId, e);
+            recordProcessedMessage(messageId, REPORT_COMPILATION_QUEUE_NAME, "REPORT_COMPILATION_EVENT", "FAILURE", e.getMessage());
+        } finally {
+            MDC.remove(CorrelationIdFilter.CORRELATION_ID_MDC_KEY);
+            MDC.remove("sqsMessageId");
+            MDC.remove("sqsQueue");
         }
     }
 

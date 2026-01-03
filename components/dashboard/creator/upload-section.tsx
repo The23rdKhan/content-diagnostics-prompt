@@ -43,6 +43,11 @@ export function UploadSection() {
   const [optionalNotes, setOptionalNotes] = useState("")
   const [capacityConfirmed, setCapacityConfirmed] = useState(false)
   const [showCapacityModal, setShowCapacityModal] = useState(false)
+  const [videoDurationMinutes, setVideoDurationMinutes] = useState<number | null>(null)
+
+  // Reviewer count based on plan (10/25/50 for basic/pro/enterprise)
+  // TODO: Get from user's subscription plan - for now default to Professional (25)
+  const reviewerCount = 25
 
   // Add-ons state
   const [addons, setAddons] = useState({
@@ -83,18 +88,38 @@ export function UploadSection() {
     setIsDragging(false)
     const files = e.dataTransfer.files
     if (files.length > 0 && files[0].type.startsWith("video/")) {
-      setUploadedFile(files[0])
-      setVideoTitle(files[0].name.replace(/\.[^/.]+$/, ""))
-      trackEvent("creator_upload_started", { fileName: files[0].name, fileSize: files[0].size })
+      const file = files[0]
+      setUploadedFile(file)
+      setVideoTitle(file.name.replace(/\.[^/.]+$/, ""))
+      trackEvent("creator_upload_started", { fileName: file.name, fileSize: file.size })
+
+      // Extract video duration from file metadata
+      const video = document.createElement("video")
+      video.preload = "metadata"
+      video.onloadedmetadata = () => {
+        setVideoDurationMinutes(Math.ceil(video.duration / 60))
+        URL.revokeObjectURL(video.src)
+      }
+      video.src = URL.createObjectURL(file)
     }
   }, [])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files && files.length > 0) {
-      setUploadedFile(files[0])
-      setVideoTitle(files[0].name.replace(/\.[^/.]+$/, ""))
-      trackEvent("creator_upload_started", { fileName: files[0].name, fileSize: files[0].size })
+      const file = files[0]
+      setUploadedFile(file)
+      setVideoTitle(file.name.replace(/\.[^/.]+$/, ""))
+      trackEvent("creator_upload_started", { fileName: file.name, fileSize: file.size })
+
+      // Extract video duration from file metadata
+      const video = document.createElement("video")
+      video.preload = "metadata"
+      video.onloadedmetadata = () => {
+        setVideoDurationMinutes(Math.ceil(video.duration / 60))
+        URL.revokeObjectURL(video.src)
+      }
+      video.src = URL.createObjectURL(file)
     }
   }
 
@@ -106,6 +131,7 @@ export function UploadSection() {
     setPrimaryGoal("")
     setCurrentStep("select-file")
     setCapacityConfirmed(false)
+    setVideoDurationMinutes(null)
     setAddons({
       extraReviewers: null,
       fasterDelivery: false,
@@ -392,7 +418,7 @@ export function UploadSection() {
               <Alert className="bg-accent/5 border-accent/30">
                 <CheckCircle className="h-4 w-4 text-accent" />
                 <AlertDescription className="text-accent">
-                  Capacity confirmed: Guaranteed 50 reviewers (completed feedback tasks from paid human reviewers),{" "}
+                  Capacity confirmed: Guaranteed {reviewerCount} reviewers (completed feedback tasks from paid human reviewers),{" "}
                   {slaOptions.find((o) => o.value === selectedSLA)?.hours}
                   -hour delivery
                 </AlertDescription>
@@ -417,7 +443,7 @@ export function UploadSection() {
         )
 
       case "add-ons":
-        const videoLengthMinutes = 22 // Mock - in production, parse from file metadata
+        const videoLengthMinutes = videoDurationMinutes || 0
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Optional enhancements to improve your report quality</p>
@@ -530,8 +556,7 @@ export function UploadSection() {
 
       case "submit":
         const selectedSLAOption = slaOptions.find((o) => o.value === selectedSLA)!
-        const baseReviewers = 50
-        const totalReviewers = baseReviewers + (addons.extraReviewers || 0)
+        const totalReviewers = reviewerCount + (addons.extraReviewers || 0)
 
         // Get stage-specific status message
         const getUploadStatusMessage = () => {

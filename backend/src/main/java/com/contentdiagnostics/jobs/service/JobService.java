@@ -8,6 +8,9 @@ import com.contentdiagnostics.jobs.dto.SubmitVideoRequest;
 import com.contentdiagnostics.jobs.entity.Job;
 import com.contentdiagnostics.jobs.entity.JobStatus;
 import com.contentdiagnostics.jobs.repository.JobRepository;
+import com.contentdiagnostics.reports.entity.Report;
+import com.contentdiagnostics.reports.repository.ReportRepository;
+import com.contentdiagnostics.tasks.service.TaskCreationService;
 import com.contentdiagnostics.videos.entity.Video;
 import com.contentdiagnostics.videos.entity.VideoStatus;
 import com.contentdiagnostics.videos.repository.VideoRepository;
@@ -31,6 +34,8 @@ public class JobService {
 
     private final JobRepository jobRepository;
     private final VideoRepository videoRepository;
+    private final ReportRepository reportRepository;
+    private final TaskCreationService taskCreationService;
 
     /**
      * Get all jobs for a creator.
@@ -81,7 +86,14 @@ public class JobService {
 
         log.info("Job {} created for video {} by creator {}", job.getId(), videoId, creator.getId());
 
-        // TODO: Enqueue video processing event to SQS
+        // Create tasks for reviewers
+        taskCreationService.createTasksForJob(job, video);
+
+        // Update job status to segmented (tasks created, awaiting human review)
+        job.setStatus(JobStatus.SEGMENTED);
+        job = jobRepository.save(job);
+
+        log.info("Job {} is now ready for review with {} tasks", job.getId(), job.getRequiredReviewers());
 
         return mapToDto(job);
     }
@@ -103,6 +115,14 @@ public class JobService {
 
         String slaStatus = determineSlaStatus(job);
         String estimatedDeliveryWindow = calculateEstimatedDelivery(job);
+
+        // Get report ID if job is delivered
+        Long reportId = null;
+        if (job.getStatus() == JobStatus.DELIVERED) {
+            reportId = reportRepository.findByJob(job)
+                    .map(Report::getId)
+                    .orElse(null);
+        }
 
         return JobDto.builder()
                 .id(job.getId())
@@ -134,6 +154,7 @@ public class JobService {
                 .estimatedDeliveryWindow(estimatedDeliveryWindow)
                 .createdAt(job.getCreatedAt())
                 .deliveredAt(job.getDeliveredAt())
+                .reportId(reportId)
                 .build();
     }
 

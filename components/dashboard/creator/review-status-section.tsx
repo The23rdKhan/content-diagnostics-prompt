@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Clock, CheckCircle, AlertCircle, Play, TrendingUp, ChevronRight, Zap, AlertTriangle, Loader2 } from "lucide-react"
 import { useCreatorJobs, getJobStatusLabel, getJobStatusHelperText } from "@/lib/hooks/use-creator"
 import type { JobDto, JobStatus } from "@/lib/types/api"
@@ -10,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { trackEvent } from "@/lib/analytics"
 
 export function ReviewStatusSection() {
+  const router = useRouter()
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null)
   const { jobs, loading, error, refetch } = useCreatorJobs()
 
@@ -99,10 +101,14 @@ export function ReviewStatusSection() {
     }
   }
 
-  const handleViewReport = (jobId: number) => {
-    trackEvent("creator_status_viewed", { jobId })
-    // In production, navigate to /creators/reports/${jobId}
-    alert(`Viewing report for job ${jobId}`)
+  const handleViewReport = (job: JobDto) => {
+    trackEvent("creator_status_viewed", { jobId: job.id, reportId: job.reportId })
+    if (job.reportId) {
+      router.push(`/creators/reports/${job.reportId}`)
+    } else {
+      // Fallback to job-based route if reportId not available
+      router.push(`/creators/reports?jobId=${job.id}`)
+    }
   }
 
   const selectedJob = selectedJobId ? jobs.find((j) => j.id === selectedJobId) : null
@@ -236,7 +242,7 @@ export function ReviewStatusSection() {
                 {/* Actions */}
                 <div className="flex flex-col gap-2 flex-shrink-0">
                   {job.status === "DELIVERED" ? (
-                    <Button size="sm" onClick={() => handleViewReport(job.id)}>
+                    <Button size="sm" onClick={() => handleViewReport(job)}>
                       View Report
                       <ChevronRight className="ml-1 h-3 w-3" />
                     </Button>
