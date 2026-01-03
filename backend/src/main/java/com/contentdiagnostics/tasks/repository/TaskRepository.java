@@ -154,4 +154,32 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
      */
     @Query("SELECT t.status, COUNT(t) FROM Task t WHERE t.job = :job GROUP BY t.status")
     List<Object[]> getTaskStatsByJob(@Param("job") Job job);
+
+    /**
+     * Count approved tasks for a reviewer since a given date.
+     */
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.reviewer = :reviewer " +
+            "AND t.status = 'APPROVED' AND t.reviewedAt >= :since")
+    int countApprovedByReviewerSince(@Param("reviewer") ReviewerProfile reviewer,
+                                     @Param("since") Instant since);
+
+    /**
+     * Sum pay amounts for approved tasks for a reviewer since a given date.
+     */
+    @Query("SELECT COALESCE(SUM(t.payAmount), 0) FROM Task t WHERE t.reviewer = :reviewer " +
+            "AND t.status = 'APPROVED' AND t.reviewedAt >= :since")
+    double sumPayAmountByReviewerSince(@Param("reviewer") ReviewerProfile reviewer,
+                                       @Param("since") Instant since);
+
+    /**
+     * Get daily earnings breakdown for a reviewer (last N days).
+     * Returns date and sum of payAmount grouped by date.
+     */
+    @Query("SELECT FUNCTION('DATE', t.reviewedAt) as date, COUNT(t), SUM(t.payAmount) " +
+            "FROM Task t WHERE t.reviewer = :reviewer AND t.status = 'APPROVED' " +
+            "AND t.reviewedAt >= :since " +
+            "GROUP BY FUNCTION('DATE', t.reviewedAt) " +
+            "ORDER BY FUNCTION('DATE', t.reviewedAt) DESC")
+    List<Object[]> getDailyEarningsBreakdown(@Param("reviewer") ReviewerProfile reviewer,
+                                             @Param("since") Instant since);
 }

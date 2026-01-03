@@ -50,11 +50,19 @@ export function CreatorDashboard() {
     return <LoadingScreen />
   }
 
-  // Format plan tier for display
+  // Format plan tier for display - map tier IDs to display names
   const getPlanDisplay = () => {
-    const planTier = user?.creatorProfile?.planTier
+    const planTier = user?.creatorProfile?.planTier?.toLowerCase()
     if (!planTier) return "Free Plan"
-    return planTier.charAt(0) + planTier.slice(1).toLowerCase() + " Plan"
+
+    // Map tier IDs to display names (matching PlanSelector)
+    const planNames: Record<string, string> = {
+      basic: "Starter",
+      professional: "Pro",
+      enterprise: "Studio",
+    }
+
+    return (planNames[planTier] || planTier.charAt(0).toUpperCase() + planTier.slice(1)) + " Plan"
   }
 
   const renderSection = () => {

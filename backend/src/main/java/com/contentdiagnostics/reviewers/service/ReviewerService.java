@@ -7,11 +7,18 @@ import com.contentdiagnostics.reviewers.config.QualificationConfig;
 import com.contentdiagnostics.reviewers.dto.*;
 import com.contentdiagnostics.reviewers.entity.ReviewerProfile;
 import com.contentdiagnostics.reviewers.repository.ReviewerProfileRepository;
+import com.contentdiagnostics.tasks.repository.TaskRepository;
+import com.contentdiagnostics.common.service.EncryptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -23,7 +30,9 @@ import java.util.List;
 public class ReviewerService {
 
     private final ReviewerProfileRepository profileRepository;
+    private final TaskRepository taskRepository;
     private final QualificationConfig qualificationConfig;
+    private final EncryptionService encryptionService;
 
     /**
      * Get reviewer profile.
@@ -95,7 +104,9 @@ public class ReviewerService {
         ReviewerProfile profile = getProfileEntity(user);
 
         profile.setPayoutMethod(request.getPayoutMethod());
-        profile.setPayoutDetails(request.getPayoutDetails()); // TODO: Encrypt
+        // Encrypt sensitive payout details before storing
+        String encryptedDetails = encryptionService.encrypt(request.getPayoutDetails());
+        profile.setPayoutDetails(encryptedDetails);
 
         profile = profileRepository.save(profile);
         return mapToDto(profile, user.getEmail());
@@ -108,14 +119,49 @@ public class ReviewerService {
     public EarningsResponse getEarnings(User user) {
         ReviewerProfile profile = getProfileEntity(user);
 
-        // TODO: Implement actual earnings history from tasks
+        // Calculate start of current month
+        LocalDate startOfMonth = LocalDate.now().withDayOfMonth(1);
+        Instant monthStart = startOfMonth.atStartOfDay(ZoneOffset.UTC).toInstant();
+
+        // Get monthly stats from completed tasks
+        int tasksThisMonth = taskRepository.countApprovedByReviewerSince(profile, monthStart);
+        double earningsThisMonth = taskRepository.sumPayAmountByReviewerSince(profile, monthStart);
+
+        // Get daily breakdown for the last 30 days
+        Instant thirtyDaysAgo = Instant.now().minusSeconds(30 * 24 * 60 * 60);
+        List<Object[]> dailyBreakdown = taskRepository.getDailyEarningsBreakdown(profile, thirtyDaysAgo);
+
+        List<EarningsResponse.EarningsBreakdown> recentEarnings = new ArrayList<>();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        for (Object[] row : dailyBreakdown) {
+            Object dateObj = row[0];
+            Long count = (Long) row[1];
+            Double amount = (Double) row[2];
+
+            String dateStr;
+            if (dateObj instanceof java.sql.Date sqlDate) {
+                dateStr = sqlDate.toLocalDate().format(formatter);
+            } else if (dateObj instanceof LocalDate ld) {
+                dateStr = ld.format(formatter);
+            } else {
+                dateStr = dateObj.toString();
+            }
+
+            recentEarnings.add(EarningsResponse.EarningsBreakdown.builder()
+                    .date(dateStr)
+                    .tasksCompleted(count.intValue())
+                    .amount(amount)
+                    .build());
+        }
+
         return EarningsResponse.builder()
                 .totalEarnings(profile.getTotalEarnings())
                 .pendingEarnings(profile.getPendingEarnings())
                 .availableForPayout(profile.getPendingEarnings())
-                .tasksCompletedThisMonth(0)
-                .earningsThisMonth(0.0)
-                .recentEarnings(List.of())
+                .tasksCompletedThisMonth(tasksThisMonth)
+                .earningsThisMonth(earningsThisMonth)
+                .recentEarnings(recentEarnings)
                 .build();
     }
 

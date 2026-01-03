@@ -114,6 +114,14 @@ app:
     max-age-seconds: 604800  # 7 days, matches refresh token expiration
   debug-tools:
     enabled: ${DEBUG_TOOLS_ENABLED:false}
+  rate-limit:
+    login-attempts-per-minute: 5
+    signup-attempts-per-minute: 3
+    password-reset-per-hour: 3
+  encryption:
+    # Base64-encoded 256-bit (32 byte) key for encrypting sensitive data
+    # Generate with: openssl rand -base64 32
+    key: ${ENCRYPTION_KEY:}
 
 # Actuator
 management:

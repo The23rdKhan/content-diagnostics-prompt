@@ -49,6 +49,9 @@ dependencies {
     // Stripe
     implementation("com.stripe:stripe-java:25.0.0")
 
+    // Rate Limiting
+    implementation("com.bucket4j:bucket4j-core:8.7.0")
+
     // JSON processing
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")

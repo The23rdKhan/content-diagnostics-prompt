@@ -11,6 +11,8 @@ import com.contentdiagnostics.common.exception.ResourceNotFoundException;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
 import com.contentdiagnostics.credits.service.CreditService;
+import com.contentdiagnostics.notifications.entity.NotificationType;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.stripe.Stripe;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
@@ -40,6 +42,7 @@ public class StripeService {
     private final StripeEventRepository stripeEventRepository;
     private final CreatorProfileRepository creatorProfileRepository;
     private final CreditService creditService;
+    private final NotificationService notificationService;
 
     @Value("${stripe.secret-key:}")
     private String stripeSecretKey;
@@ -386,7 +389,18 @@ public class StripeService {
         if (invoice == null) return;
 
         log.info("Payment succeeded for invoice {}", invoice.getId());
-        // TODO: Create notification for user
+
+        // Create notification for user
+        String customerId = invoice.getCustomer();
+        creatorProfileRepository.findByStripeCustomerId(customerId).ifPresent(profile -> {
+            notificationService.createNotification(
+                    profile.getUser(),
+                    NotificationType.SUBSCRIPTION_BILLING,
+                    "Payment Successful",
+                    "Your payment of " + formatAmount(invoice.getAmountPaid()) + " was processed successfully.",
+                    "/creators/billing"
+            );
+        });
     }
 
     private void handlePaymentFailed(Event event) {
@@ -396,6 +410,24 @@ public class StripeService {
         if (invoice == null) return;
 
         log.warn("Payment failed for invoice {}", invoice.getId());
-        // TODO: Create notification for user
+
+        // Create notification for user
+        String customerId = invoice.getCustomer();
+        creatorProfileRepository.findByStripeCustomerId(customerId).ifPresent(profile -> {
+            notificationService.createNotification(
+                    profile.getUser(),
+                    NotificationType.SUBSCRIPTION_BILLING,
+                    "Payment Failed",
+                    "Your payment of " + formatAmount(invoice.getAmountDue()) + " failed. Please update your payment method.",
+                    "/creators/billing"
+            );
+            log.info("Created payment failure notification for user {}", profile.getUser().getId());
+        });
+    }
+
+    private String formatAmount(Long amountInCents) {
+        if (amountInCents == null) return "$0.00";
+        double amount = amountInCents / 100.0;
+        return String.format("$%.2f", amount);
     }
 }

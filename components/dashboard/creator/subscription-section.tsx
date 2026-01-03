@@ -91,9 +91,9 @@ export function SubscriptionSection() {
   // Fallback display if no subscription data
   const currentPlan = subscription
   const displayPlans = plans.length > 0 ? plans : [
-    { id: "starter", name: "Starter", price: 49, reviewersPerVideo: 5, features: [], interval: "MONTHLY" as const },
-    { id: "pro", name: "Pro", price: 149, reviewersPerVideo: 10, features: [], interval: "MONTHLY" as const },
-    { id: "studio", name: "Studio", price: 399, reviewersPerVideo: 15, features: [], interval: "MONTHLY" as const },
+    { id: "basic", name: "Starter", price: 49, reviewersPerVideo: 5, features: [], interval: "MONTHLY" as const },
+    { id: "professional", name: "Pro", price: 149, reviewersPerVideo: 10, features: [], interval: "MONTHLY" as const },
+    { id: "enterprise", name: "Studio", price: 399, reviewersPerVideo: 15, features: [], interval: "MONTHLY" as const },
   ]
 
   return (
