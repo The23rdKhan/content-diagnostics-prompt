@@ -44,14 +44,16 @@ export function UploadSection() {
   const [capacityConfirmed, setCapacityConfirmed] = useState(false)
   const [showCapacityModal, setShowCapacityModal] = useState(false)
   const [videoDurationMinutes, setVideoDurationMinutes] = useState<number | null>(null)
+  const [contentCertified, setContentCertified] = useState(false)
 
-  // Reviewer count based on plan (10/25/50 for basic/pro/enterprise)
-  // TODO: Get from user's subscription plan - for now default to Professional (25)
-  const reviewerCount = 25
+  // Reviewer count based on plan (5/10/15 for basic/pro/enterprise)
+  // Research shows signal saturates at 5-12 reviewers, so we use smaller pools
+  // TODO: Get from user's subscription plan - for now default to Professional (10)
+  const reviewerCount = 10
 
   // Add-ons state
   const [addons, setAddons] = useState({
-    extraReviewers: null as null | 10 | 25,
+    extraReviewers: null as null | 2 | 5,
     fasterDelivery: false,
     fullWatchSummary: false,
     liveFeedback: false,
@@ -132,6 +134,7 @@ export function UploadSection() {
     setCurrentStep("select-file")
     setCapacityConfirmed(false)
     setVideoDurationMinutes(null)
+    setContentCertified(false)
     setAddons({
       extraReviewers: null,
       fasterDelivery: false,
@@ -358,11 +361,33 @@ export function UploadSection() {
                 rows={3}
               />
             </div>
+
+            {/* Content Certification */}
+            <div className="rounded-lg border border-border bg-secondary/50 p-4">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="content-certification"
+                  checked={contentCertified}
+                  onCheckedChange={(checked) => setContentCertified(checked === true)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1">
+                  <Label htmlFor="content-certification" className="font-medium cursor-pointer">
+                    Content Certification *
+                  </Label>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    I certify that this video does not contain explicit, violent, hateful, or illegal content.
+                    I understand that reviewers may report inappropriate content, and violations may result in account suspension.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <Button variant="outline" onClick={goToPreviousStep} className="flex-1 bg-transparent">
                 <ChevronLeft className="mr-2 h-4 w-4" /> Back
               </Button>
-              <Button onClick={goToNextStep} className="flex-1" disabled={!videoTitle.trim()}>
+              <Button onClick={goToNextStep} className="flex-1" disabled={!videoTitle.trim() || !contentCertified}>
                 Continue <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -455,26 +480,26 @@ export function UploadSection() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-foreground">Extra Reviewers</p>
-                      <span className="text-xs text-accent">+$10 or +$20</span>
+                      <span className="text-xs text-accent">+$5 or +$10</span>
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">Get feedback from more paid reviewers</p>
                   </div>
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      variant={addons.extraReviewers === 10 ? "default" : "outline"}
-                      onClick={() => handleAddonToggle("extraReviewers", addons.extraReviewers === 10 ? null : 10)}
-                      className={addons.extraReviewers !== 10 ? "bg-transparent" : ""}
+                      variant={addons.extraReviewers === 2 ? "default" : "outline"}
+                      onClick={() => handleAddonToggle("extraReviewers", addons.extraReviewers === 2 ? null : 2)}
+                      className={addons.extraReviewers !== 2 ? "bg-transparent" : ""}
                     >
-                      +10
+                      +2
                     </Button>
                     <Button
                       size="sm"
-                      variant={addons.extraReviewers === 25 ? "default" : "outline"}
-                      onClick={() => handleAddonToggle("extraReviewers", addons.extraReviewers === 25 ? null : 25)}
-                      className={addons.extraReviewers !== 25 ? "bg-transparent" : ""}
+                      variant={addons.extraReviewers === 5 ? "default" : "outline"}
+                      onClick={() => handleAddonToggle("extraReviewers", addons.extraReviewers === 5 ? null : 5)}
+                      className={addons.extraReviewers !== 5 ? "bg-transparent" : ""}
                     >
-                      +25
+                      +5
                     </Button>
                   </div>
                 </div>

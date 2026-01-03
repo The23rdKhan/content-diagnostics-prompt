@@ -16,12 +16,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SubmitVideoRequest {
 
-    @Min(value = 10, message = "Minimum 10 reviewers required")
-    @Max(value = 100, message = "Maximum 100 reviewers allowed")
+    @Min(value = 5, message = "Minimum 5 reviewers required")
+    @Max(value = 20, message = "Maximum 20 reviewers allowed")
     private Integer requiredReviewers;
 
     // Add-ons
-    private Integer extraReviewers; // 10 or 25
+    private Integer extraReviewers; // 2 or 5
 
     private Boolean fasterDelivery;
 

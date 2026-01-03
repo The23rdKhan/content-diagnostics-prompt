@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { X, Play, AlertCircle } from "lucide-react"
+import { X, Play, AlertCircle, Flag } from "lucide-react"
 import type { TaskDto } from "@/lib/types/api"
 
 // Helper to format segment duration as mm:ss
@@ -16,13 +16,27 @@ interface TaskCompletionModalProps {
   task: TaskDto
   onClose: () => void
   onSubmit: (taskId: string, answers: Record<string, string>, watchTime: number) => void
+  onReport?: (taskId: string, reason: string, description: string) => void
 }
 
-export function TaskCompletionModal({ task, onClose, onSubmit }: TaskCompletionModalProps) {
+const reportReasons = [
+  { value: "explicit", label: "Explicit/Adult Content" },
+  { value: "violence", label: "Violence or Gore" },
+  { value: "hate", label: "Hate Speech or Discrimination" },
+  { value: "illegal", label: "Illegal Activity" },
+  { value: "personal", label: "Personal Information Exposed" },
+  { value: "other", label: "Other" },
+]
+
+export function TaskCompletionModal({ task, onClose, onSubmit, onReport }: TaskCompletionModalProps) {
   const [answers, setAnswers] = useState<Record<string, any>>({})
   const [watchTime, setWatchTime] = useState(0)
   const [canSubmit, setCanSubmit] = useState(false)
   const [videoStarted, setVideoStarted] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [reportReason, setReportReason] = useState("")
+  const [reportDescription, setReportDescription] = useState("")
+  const [isReporting, setIsReporting] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   // Track actual video watch time
@@ -49,6 +63,19 @@ export function TaskCompletionModal({ task, onClose, onSubmit }: TaskCompletionM
 
   const handleSubmit = () => {
     onSubmit(String(task.id), answers, watchTime)
+  }
+
+  const handleReportSubmit = async () => {
+    if (!reportReason) return
+    setIsReporting(true)
+    try {
+      if (onReport) {
+        onReport(String(task.id), reportReason, reportDescription)
+      }
+      onClose()
+    } finally {
+      setIsReporting(false)
+    }
   }
 
   const allRequiredAnswered = task.questions.filter((q) => q.type !== "text").every((q) => answers[q.id] !== undefined)
@@ -199,13 +226,100 @@ export function TaskCompletionModal({ task, onClose, onSubmit }: TaskCompletionM
 
           {/* Submit */}
           <div className="flex items-center justify-between pt-4 border-t border-border">
-            <p className="text-sm text-muted-foreground">* Required fields</p>
-            <Button onClick={handleSubmit} disabled={!allRequiredAnswered || !canSubmit}>
-              Submit Feedback
-            </Button>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-muted-foreground">* Required fields</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowReportModal(true)}
+                className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:border-red-900 dark:hover:bg-red-950"
+              >
+                <Flag className="h-4 w-4 mr-2" />
+                Report & Exit
+              </Button>
+              <Button onClick={handleSubmit} disabled={!allRequiredAnswered || !canSubmit}>
+                Submit Feedback
+              </Button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-card rounded-xl border border-border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
+                <Flag className="h-5 w-5 text-red-500" />
+                Report Content
+              </h3>
+              <Button variant="ghost" size="sm" onClick={() => setShowReportModal(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-3">
+                <p className="text-sm text-yellow-600 dark:text-yellow-500">
+                  Your wellbeing is our priority. If this content is distressing, please report it and exit. You will not be penalized.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Why are you reporting this content? *
+                </label>
+                <div className="space-y-2">
+                  {reportReasons.map((reason) => (
+                    <button
+                      key={reason.value}
+                      onClick={() => setReportReason(reason.value)}
+                      className={`w-full text-left rounded-lg border px-4 py-3 text-sm transition-colors ${
+                        reportReason === reason.value
+                          ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400"
+                          : "border-border text-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      {reason.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Additional details (optional)
+                </label>
+                <textarea
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring min-h-20"
+                  placeholder="Provide any additional context..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowReportModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                  onClick={handleReportSubmit}
+                  disabled={!reportReason || isReporting}
+                >
+                  {isReporting ? "Reporting..." : "Report & Exit"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

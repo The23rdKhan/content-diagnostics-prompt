@@ -91,9 +91,9 @@ export function SubscriptionSection() {
   // Fallback display if no subscription data
   const currentPlan = subscription
   const displayPlans = plans.length > 0 ? plans : [
-    { id: "starter", name: "Starter", price: 49, reviewersPerVideo: 20, features: [], interval: "MONTHLY" as const },
-    { id: "pro", name: "Pro", price: 149, reviewersPerVideo: 50, features: [], interval: "MONTHLY" as const },
-    { id: "studio", name: "Studio", price: 399, reviewersPerVideo: 100, features: [], interval: "MONTHLY" as const },
+    { id: "starter", name: "Starter", price: 49, reviewersPerVideo: 5, features: [], interval: "MONTHLY" as const },
+    { id: "pro", name: "Pro", price: 149, reviewersPerVideo: 10, features: [], interval: "MONTHLY" as const },
+    { id: "studio", name: "Studio", price: 399, reviewersPerVideo: 15, features: [], interval: "MONTHLY" as const },
   ]
 
   return (
@@ -215,7 +215,7 @@ export function SubscriptionSection() {
         <h2 className="text-lg font-semibold text-card-foreground mb-4">Plan Features</h2>
         <ul className="space-y-3">
           {(currentPlan?.features?.length ? currentPlan.features : [
-            "Minimum 50 reviewers per video",
+            "10 reviewers per video",
             "AI diagnostics included",
             "Asynchronous human feedback",
             "24-hour turnaround",

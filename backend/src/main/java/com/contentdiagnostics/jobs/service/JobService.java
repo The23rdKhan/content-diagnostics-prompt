@@ -66,7 +66,7 @@ public class JobService {
 
         int requiredReviewers = request.getRequiredReviewers() != null
                 ? request.getRequiredReviewers()
-                : 50;
+                : 10; // Default to Professional tier (5/10/15 for basic/pro/enterprise)
 
         Job job = Job.builder()
                 .creator(creator)
