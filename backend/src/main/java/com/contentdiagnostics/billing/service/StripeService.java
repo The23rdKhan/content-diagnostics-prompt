@@ -77,14 +77,26 @@ public class StripeService {
 
     /**
      * Create a checkout session for subscription.
+     * Returns mock data when Stripe is not configured (development mode).
      */
     public CheckoutSessionResponse createCheckoutSession(User user, CheckoutSessionRequest request) {
-        if (!stripeConfigured) {
-            throw new BadRequestException("Stripe is not configured. Set STRIPE_SECRET_KEY environment variable.");
-        }
-
         CreatorProfile profile = creatorProfileRepository.findByUser(user)
                 .orElseThrow(() -> new ResourceNotFoundException("Creator profile", user.getId().toString()));
+
+        // Return mock checkout session when Stripe is not configured (dev mode)
+        if (!stripeConfigured) {
+            log.info("Stripe not configured - returning mock checkout session for user {}", user.getId());
+
+            String successUrl = request.getSuccessUrl() != null
+                    ? request.getSuccessUrl()
+                    : "http://localhost:3000/creators/subscription?success=true";
+
+            // In dev mode, redirect directly to success URL to simulate successful payment
+            return CheckoutSessionResponse.builder()
+                    .sessionId("mock_session_" + System.currentTimeMillis())
+                    .url(successUrl + "?session_id=mock_session_" + System.currentTimeMillis())
+                    .build();
+        }
 
         String priceId = getPriceId(request.getPlanTier());
         if (priceId == null || priceId.isEmpty()) {
@@ -132,22 +144,27 @@ public class StripeService {
 
     /**
      * Create a customer portal session.
+     * Returns mock redirect when Stripe is not configured (development mode).
      */
     public PortalSessionResponse createPortalSession(User user, String returnUrl) {
-        if (!stripeConfigured) {
-            throw new BadRequestException("Stripe is not configured. Set STRIPE_SECRET_KEY environment variable.");
-        }
-
         CreatorProfile profile = creatorProfileRepository.findByUser(user)
                 .orElseThrow(() -> new ResourceNotFoundException("Creator profile", user.getId().toString()));
+
+        String url = returnUrl != null ? returnUrl : "http://localhost:3000/creators/subscription";
+
+        // Return mock portal session when Stripe is not configured (dev mode)
+        if (!stripeConfigured) {
+            log.info("Stripe not configured - returning mock portal session for user {}", user.getId());
+            return PortalSessionResponse.builder()
+                    .url(url + "?portal=mock")
+                    .build();
+        }
 
         if (profile.getStripeCustomerId() == null) {
             throw new BadRequestException("No subscription found");
         }
 
         try {
-            String url = returnUrl != null ? returnUrl : "http://localhost:3000/creators/subscription";
-
             com.stripe.param.billingportal.SessionCreateParams params =
                     com.stripe.param.billingportal.SessionCreateParams.builder()
                     .setCustomer(profile.getStripeCustomerId())

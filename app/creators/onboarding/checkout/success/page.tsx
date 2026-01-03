@@ -1,25 +1,52 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { trackEvent } from "@/lib/analytics"
+import { api } from "@/lib/api"
+import { LoadingScreen } from "@/components/loading-screen"
 import { CheckCircle, ArrowRight, Loader2 } from "lucide-react"
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [countdown, setCountdown] = useState(5)
+  const [activating, setActivating] = useState(true)
 
   useEffect(() => {
-    // Clear plan selection from session (payment is complete)
-    sessionStorage.removeItem("selected_plan")
-    sessionStorage.removeItem("selected_addons")
+    const activateSubscription = async () => {
+      const sessionId = searchParams.get("session_id")
+      const selectedPlan = sessionStorage.getItem("selected_plan") || "basic"
 
-    // Track successful checkout
-    trackEvent("checkout_completed", { source: "stripe" })
+      // If this is a mock session (dev mode), activate the subscription
+      if (sessionId?.startsWith("mock_session_")) {
+        try {
+          await api.post(`/creator/subscription/activate?planTier=${selectedPlan}`, {})
+          trackEvent("mock_subscription_activated", { plan: selectedPlan })
+        } catch (error) {
+          console.error("Failed to activate mock subscription:", error)
+        }
+      }
+
+      setActivating(false)
+
+      // Clear plan selection from session (payment is complete)
+      sessionStorage.removeItem("selected_plan")
+      sessionStorage.removeItem("selected_addons")
+
+      // Track successful checkout
+      trackEvent("checkout_completed", { source: sessionId?.startsWith("mock_") ? "mock" : "stripe" })
+    }
+
+    activateSubscription()
+  }, [searchParams])
+
+  useEffect(() => {
+    if (activating) return
 
     // Auto-redirect countdown
     const timer = setInterval(() => {
@@ -34,7 +61,7 @@ export default function CheckoutSuccessPage() {
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [router])
+  }, [router, activating])
 
   return (
     <div className="min-h-screen bg-background py-12">
@@ -84,5 +111,13 @@ export default function CheckoutSuccessPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <CheckoutSuccessContent />
+    </Suspense>
   )
 }

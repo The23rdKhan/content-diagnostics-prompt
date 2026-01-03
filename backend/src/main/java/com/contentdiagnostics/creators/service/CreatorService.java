@@ -3,6 +3,8 @@ package com.contentdiagnostics.creators.service;
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
 import com.contentdiagnostics.creators.dto.CreatorProfileDto;
+import com.contentdiagnostics.creators.dto.PlanDto;
+import com.contentdiagnostics.creators.dto.SubscriptionDto;
 import com.contentdiagnostics.creators.dto.UpdateCreatorProfileRequest;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
@@ -10,6 +12,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 /**
  * Service for creator profile operations.
@@ -137,6 +144,131 @@ public class CreatorService {
     public CreatorProfile getProfileEntity(User user) {
         return creatorProfileRepository.findByUser(user)
                 .orElseThrow(() -> new ResourceNotFoundException("Creator profile not found"));
+    }
+
+    /**
+     * Get available subscription plans.
+     */
+    public List<PlanDto> getAvailablePlans() {
+        return List.of(
+            PlanDto.builder()
+                .id("basic")
+                .name("Starter")
+                .description("Perfect for getting started with content feedback")
+                .price(new BigDecimal("49.00"))
+                .priceDisplay("$49")
+                .billingPeriod("month")
+                .reviewersPerVideo(5)
+                .videosPerMonth(3)
+                .features(List.of(
+                    "5 reviewers per video",
+                    "3 videos per month",
+                    "Basic analytics",
+                    "Email support"
+                ))
+                .popular(false)
+                .build(),
+            PlanDto.builder()
+                .id("professional")
+                .name("Professional")
+                .description("For creators serious about audience engagement")
+                .price(new BigDecimal("149.00"))
+                .priceDisplay("$149")
+                .billingPeriod("month")
+                .reviewersPerVideo(10)
+                .videosPerMonth(10)
+                .features(List.of(
+                    "10 reviewers per video",
+                    "10 videos per month",
+                    "Advanced analytics",
+                    "Priority support",
+                    "Audience demographics"
+                ))
+                .popular(true)
+                .build(),
+            PlanDto.builder()
+                .id("enterprise")
+                .name("Enterprise")
+                .description("For teams and high-volume creators")
+                .price(new BigDecimal("399.00"))
+                .priceDisplay("$399")
+                .billingPeriod("month")
+                .reviewersPerVideo(15)
+                .videosPerMonth(-1) // Unlimited
+                .features(List.of(
+                    "15 reviewers per video",
+                    "Unlimited videos",
+                    "Full analytics suite",
+                    "Dedicated support",
+                    "Custom integrations",
+                    "Team collaboration"
+                ))
+                .popular(false)
+                .build()
+        );
+    }
+
+    /**
+     * Get subscription details for a user.
+     */
+    @Transactional(readOnly = true)
+    public SubscriptionDto getSubscription(User user) {
+        CreatorProfile profile = creatorProfileRepository.findByUser(user)
+                .orElseThrow(() -> new ResourceNotFoundException("Creator profile not found"));
+
+        String planTier = profile.getPlanTier() != null ? profile.getPlanTier() : "basic";
+        PlanDto plan = getAvailablePlans().stream()
+                .filter(p -> p.getId().equals(planTier))
+                .findFirst()
+                .orElse(getAvailablePlans().get(0));
+
+        boolean hasSubscription = profile.getStripeSubscriptionId() != null;
+        Instant periodStart = profile.getCreatedAt();
+        Instant periodEnd = periodStart.plus(30, ChronoUnit.DAYS);
+
+        return SubscriptionDto.builder()
+                .planId(plan.getId())
+                .planName(plan.getName())
+                .status(hasSubscription ? "active" : "inactive")
+                .monthlyPrice(plan.getPrice())
+                .billingPeriod(plan.getBillingPeriod())
+                .currentPeriodStart(periodStart)
+                .currentPeriodEnd(periodEnd)
+                .remainingCredits(profile.getRemainingCredits())
+                .videosThisMonth(0) // TODO: Calculate from jobs
+                .videosLimit(plan.getVideosPerMonth())
+                .cancelAtPeriodEnd(false)
+                .stripeCustomerId(profile.getStripeCustomerId())
+                .stripeSubscriptionId(profile.getStripeSubscriptionId())
+                .build();
+    }
+
+    /**
+     * Activate a subscription (mock mode for development).
+     * In production, this would be called by the Stripe webhook.
+     */
+    @Transactional
+    public SubscriptionDto activateSubscription(User user, String planTier) {
+        CreatorProfile profile = creatorProfileRepository.findByUser(user)
+                .orElseThrow(() -> new ResourceNotFoundException("Creator profile not found"));
+
+        // Update the profile with mock subscription data
+        profile.setPlanTier(planTier);
+        profile.setStripeCustomerId("mock_cus_" + user.getId());
+        profile.setStripeSubscriptionId("mock_sub_" + System.currentTimeMillis());
+
+        // Set initial credits based on plan
+        int credits = switch (planTier.toLowerCase()) {
+            case "professional" -> 10;
+            case "enterprise" -> 50;
+            default -> 3; // basic
+        };
+        profile.setRemainingCredits(credits);
+
+        creatorProfileRepository.save(profile);
+        log.info("Activated mock subscription for user {}: plan={}", user.getId(), planTier);
+
+        return getSubscription(user);
     }
 
     /**

@@ -4,6 +4,8 @@ import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.common.dto.ApiResponse;
 import com.contentdiagnostics.common.util.SecurityUtils;
 import com.contentdiagnostics.creators.dto.CreatorProfileDto;
+import com.contentdiagnostics.creators.dto.PlanDto;
+import com.contentdiagnostics.creators.dto.SubscriptionDto;
 import com.contentdiagnostics.creators.dto.UpdateCreatorProfileRequest;
 import com.contentdiagnostics.creators.service.CreatorService;
 import com.contentdiagnostics.jobs.dto.JobDto;
@@ -39,6 +41,39 @@ public class CreatorController {
     private final VideoService videoService;
     private final JobService jobService;
     private final ReportService reportService;
+
+    /**
+     * Get available subscription plans.
+     * GET /api/creator/plans
+     */
+    @GetMapping("/plans")
+    public ResponseEntity<ApiResponse<List<PlanDto>>> getPlans() {
+        List<PlanDto> plans = creatorService.getAvailablePlans();
+        return ResponseEntity.ok(ApiResponse.success(plans));
+    }
+
+    /**
+     * Get current creator's subscription.
+     * GET /api/creator/subscription
+     */
+    @GetMapping("/subscription")
+    public ResponseEntity<ApiResponse<SubscriptionDto>> getSubscription() {
+        User user = SecurityUtils.getCurrentUser();
+        SubscriptionDto subscription = creatorService.getSubscription(user);
+        return ResponseEntity.ok(ApiResponse.success(subscription));
+    }
+
+    /**
+     * Activate subscription (mock mode for development).
+     * POST /api/creator/subscription/activate
+     */
+    @PostMapping("/subscription/activate")
+    public ResponseEntity<ApiResponse<SubscriptionDto>> activateSubscription(
+            @RequestParam String planTier) {
+        User user = SecurityUtils.getCurrentUser();
+        SubscriptionDto subscription = creatorService.activateSubscription(user, planTier);
+        return ResponseEntity.ok(ApiResponse.success("Subscription activated", subscription));
+    }
 
     /**
      * Get current creator's profile.

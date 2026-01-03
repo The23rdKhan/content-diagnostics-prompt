@@ -56,14 +56,15 @@ export function useCreatorSubscription() {
 
 /**
  * Hook to fetch available subscription plans.
+ * Uses the public /billing/plans endpoint that doesn't require auth.
  */
 export function useAvailablePlans() {
-  const { data, loading, error, refetch } = useApi<{ plans: SubscriptionPlan[] }>(
-    "/creator/plans"
+  const { data, loading, error, refetch } = useApi<SubscriptionPlan[]>(
+    "/billing/plans"
   )
 
   return {
-    plans: data?.plans ?? [],
+    plans: data ?? [],
     loading,
     error,
     refetch,

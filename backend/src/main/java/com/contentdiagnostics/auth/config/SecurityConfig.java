@@ -57,6 +57,8 @@ public class SecurityConfig {
                         .requestMatchers("/webhooks/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // Public billing endpoints for onboarding
+                        .requestMatchers(HttpMethod.GET, "/billing/plans").permitAll()
 
                         // Creator endpoints
                         .requestMatchers("/creator/**").hasRole("CREATOR")

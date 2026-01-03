@@ -1,9 +1,16 @@
 /** @type {import('next').NextConfig} */
+const isDev = process.env.NODE_ENV === "development"
+
 const nextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
   },
   async headers() {
+    // Allow localhost:8080 in development for backend API calls
+    const connectSrc = isDev
+      ? "'self' http://localhost:8080 https://api.stripe.com https://*.vercel-insights.com https://*.vercel-analytics.com"
+      : "'self' https://api.stripe.com https://*.vercel-insights.com https://*.vercel-analytics.com"
+
     return [
       {
         // Apply security headers to all routes
@@ -45,7 +52,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
-              "connect-src 'self' https://api.stripe.com https://*.vercel-insights.com https://*.vercel-analytics.com",
+              `connect-src ${connectSrc}`,
               "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
               "frame-ancestors 'self'",
               "form-action 'self'",

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL database
   postgres:
@@ -70,9 +68,13 @@ services:
       S3_ENDPOINT: http://localstack:4566
       SQS_QUEUE_URL: http://localstack:4566/000000000000/content-diagnostics-queue
 
-      # Stripe (test mode - use your own test keys)
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      # Stripe (test mode - use your own test keys from https://dashboard.stripe.com/test/apikeys)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Create products/prices in Stripe Dashboard or via CLI, then add IDs here
+      STRIPE_PRICE_BASIC: ${STRIPE_PRICE_BASIC:-}
+      STRIPE_PRICE_PROFESSIONAL: ${STRIPE_PRICE_PROFESSIONAL:-}
+      STRIPE_PRICE_ENTERPRISE: ${STRIPE_PRICE_ENTERPRISE:-}
 
       # Resend (optional)
       RESEND_API_KEY: ${RESEND_API_KEY:-}
@@ -85,6 +87,22 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  # Stripe CLI for webhook forwarding (requires STRIPE_SECRET_KEY)
+  stripe-cli:
+    image: stripe/stripe-cli:latest
+    container_name: contentdiag-stripe
+    profiles:
+      - stripe
+    depends_on:
+      - app
+    environment:
+      STRIPE_API_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_DEVICE_NAME: contentdiag-docker
+    command: listen --forward-to http://app:8080/api/webhooks/stripe --skip-verify
+    restart: on-failure
+    # The webhook signing secret will be printed in the logs
+    # Use: docker logs contentdiag-stripe to see it
 
   # Optional: pgAdmin for database management
   pgadmin:
