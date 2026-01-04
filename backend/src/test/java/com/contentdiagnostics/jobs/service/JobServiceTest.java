@@ -10,6 +10,7 @@ import com.contentdiagnostics.jobs.dto.SubmitVideoRequest;
 import com.contentdiagnostics.jobs.entity.Job;
 import com.contentdiagnostics.jobs.entity.JobStatus;
 import com.contentdiagnostics.jobs.repository.JobRepository;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.contentdiagnostics.reports.repository.ReportRepository;
 import com.contentdiagnostics.tasks.service.TaskCreationService;
 import com.contentdiagnostics.videos.entity.Video;
@@ -54,6 +55,9 @@ class JobServiceTest {
 
     @Mock
     private CreditService creditService;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private JobService jobService;

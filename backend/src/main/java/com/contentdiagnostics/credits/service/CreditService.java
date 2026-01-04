@@ -13,6 +13,8 @@ import com.contentdiagnostics.credits.entity.CreditTransaction;
 import com.contentdiagnostics.credits.entity.CreditTransactionType;
 import com.contentdiagnostics.credits.repository.CreditBundleRepository;
 import com.contentdiagnostics.credits.repository.CreditTransactionRepository;
+import com.contentdiagnostics.notifications.entity.NotificationType;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.contentdiagnostics.plans.service.PlanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -39,9 +42,13 @@ public class CreditService {
     private final CreditTransactionRepository transactionRepository;
     private final CreditBundleRepository creditBundleRepository;
     private final PlanService planService;
+    private final NotificationService notificationService;
 
     // Credits required per video (standard video < 30 min)
     public static final int CREDITS_PER_VIDEO = 5;
+
+    // Low credits threshold - warn when credits drop to this level or below
+    private static final int LOW_CREDITS_THRESHOLD = 3;
 
     /**
      * Get credit balance and usage info for a creator.
@@ -146,7 +153,19 @@ public class CreditService {
 
         log.info("Deducted {} credits for job {} from creator {}", creditsRequired, jobId, profile.getId());
 
-        return transactionRepository.save(tx);
+        CreditTransaction saved = transactionRepository.save(tx);
+
+        // Check if credits are low and notify user
+        if (newBalance <= LOW_CREDITS_THRESHOLD && newBalance >= 0) {
+            notificationService.createNotification(
+                    user,
+                    NotificationType.LOW_CREDITS,
+                    Map.of("remainingCredits", newBalance)
+            );
+            log.info("Low credits warning sent to creator {} (remaining: {})", profile.getId(), newBalance);
+        }
+
+        return saved;
     }
 
     /**

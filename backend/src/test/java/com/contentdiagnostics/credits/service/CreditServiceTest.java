@@ -13,6 +13,7 @@ import com.contentdiagnostics.credits.entity.CreditTransaction;
 import com.contentdiagnostics.credits.entity.CreditTransactionType;
 import com.contentdiagnostics.credits.repository.CreditBundleRepository;
 import com.contentdiagnostics.credits.repository.CreditTransactionRepository;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.contentdiagnostics.plans.service.PlanService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,6 +52,9 @@ class CreditServiceTest {
     @Mock
     private PlanService planService;
 
+    @Mock
+    private NotificationService notificationService;
+
     private CreditService creditService;
 
     private User testUser;
@@ -67,7 +71,8 @@ class CreditServiceTest {
                 creatorProfileRepository,
                 transactionRepository,
                 creditBundleRepository,
-                planService
+                planService,
+                notificationService
         );
 
         testUser = new User();

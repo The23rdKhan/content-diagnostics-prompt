@@ -4,6 +4,9 @@ package com.contentdiagnostics.notifications.entity;
  * Types of notifications.
  */
 public enum NotificationType {
+    // Common notifications
+    WELCOME,
+
     // Creator notifications
     UPLOAD_RECEIVED,
     PROCESSING_UPDATE,
@@ -12,6 +15,8 @@ public enum NotificationType {
     REPORT_READY,
     SUBSCRIPTION_BILLING,
     ADDON_CONFIRMATION,
+    LOW_CREDITS,
+    SUBSCRIPTION_EXPIRING,
 
     // Reviewer notifications
     QUALIFICATION_PASSED,
@@ -22,5 +27,6 @@ public enum NotificationType {
     TASK_REJECTED,
     PAYOUT_PENDING,
     PAYOUT_RELEASED,
-    POLICY_UPDATE
+    POLICY_UPDATE,
+    NEW_TASKS_AVAILABLE
 }

@@ -3,6 +3,11 @@ package com.contentdiagnostics.admin.controller;
 import com.contentdiagnostics.admin.dto.*;
 import com.contentdiagnostics.admin.service.AdminService;
 import com.contentdiagnostics.common.dto.ApiResponse;
+import com.contentdiagnostics.common.dto.PagedResponse;
+import com.contentdiagnostics.notifications.dto.EmailLogDto;
+import com.contentdiagnostics.notifications.dto.EmailStatsDto;
+import com.contentdiagnostics.notifications.entity.EmailLog.EmailStatus;
+import com.contentdiagnostics.notifications.entity.NotificationType;
 import com.contentdiagnostics.payouts.dto.PayoutDto;
 import com.contentdiagnostics.tasks.dto.TaskDto;
 import jakarta.validation.Valid;
@@ -157,5 +162,43 @@ public class AdminController {
     public ResponseEntity<ApiResponse<PayoutDto>> releasePayout(@PathVariable Long id) {
         PayoutDto payout = adminService.releasePayout(id);
         return ResponseEntity.ok(ApiResponse.success("Payout released", payout));
+    }
+
+    // ==================== Email Logs ====================
+
+    /**
+     * Get email statistics.
+     * GET /api/admin/emails/stats
+     */
+    @GetMapping("/emails/stats")
+    public ResponseEntity<ApiResponse<EmailStatsDto>> getEmailStats() {
+        EmailStatsDto stats = adminService.getEmailStats();
+        return ResponseEntity.ok(ApiResponse.success(stats));
+    }
+
+    /**
+     * Get email logs with optional filters.
+     * GET /api/admin/emails
+     */
+    @GetMapping("/emails")
+    public ResponseEntity<ApiResponse<PagedResponse<EmailLogDto>>> getEmailLogs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) EmailStatus status,
+            @RequestParam(required = false) NotificationType type,
+            @RequestParam(required = false) String email) {
+
+        PagedResponse<EmailLogDto> logs = adminService.getEmailLogs(page, size, status, type, email);
+        return ResponseEntity.ok(ApiResponse.success(logs));
+    }
+
+    /**
+     * Get email log by ID.
+     * GET /api/admin/emails/{id}
+     */
+    @GetMapping("/emails/{id}")
+    public ResponseEntity<ApiResponse<EmailLogDto>> getEmailLog(@PathVariable Long id) {
+        EmailLogDto log = adminService.getEmailLog(id);
+        return ResponseEntity.ok(ApiResponse.success(log));
     }
 }

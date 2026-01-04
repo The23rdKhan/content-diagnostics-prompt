@@ -11,6 +11,8 @@ import com.contentdiagnostics.common.exception.ConflictException;
 import com.contentdiagnostics.common.exception.UnauthorizedException;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
+import com.contentdiagnostics.notifications.entity.NotificationType;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.contentdiagnostics.reviewers.entity.ReviewerProfile;
 import com.contentdiagnostics.reviewers.repository.ReviewerProfileRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Service handling authentication operations.
@@ -41,6 +44,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final NotificationService notificationService;
 
     @Value("${app.reviewer.initial-quality-score:100}")
     private int initialQualityScore;
@@ -79,6 +83,15 @@ public class AuthService {
 
         // Create role-specific profile
         createRoleProfile(user, request);
+
+        // Send welcome notification
+        notificationService.createNotification(
+                user,
+                NotificationType.WELCOME,
+                Map.of("role", user.getRole().name())
+        );
+
+        log.info("New user registered: {} as {}", user.getEmail(), user.getRole());
 
         // Generate tokens
         return createAuthResponse(user, userAgent, ipAddress);

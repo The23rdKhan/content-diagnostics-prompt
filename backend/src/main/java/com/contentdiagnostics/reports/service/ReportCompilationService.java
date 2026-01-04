@@ -3,6 +3,8 @@ package com.contentdiagnostics.reports.service;
 import com.contentdiagnostics.jobs.entity.Job;
 import com.contentdiagnostics.jobs.entity.JobStatus;
 import com.contentdiagnostics.jobs.repository.JobRepository;
+import com.contentdiagnostics.notifications.entity.NotificationType;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.contentdiagnostics.reports.dto.ReportDto;
 import com.contentdiagnostics.reports.entity.Report;
 import com.contentdiagnostics.reports.entity.ReportStatus;
@@ -37,6 +39,7 @@ public class ReportCompilationService {
     private final TaskRepository taskRepository;
     private final JobRepository jobRepository;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
 
     /**
      * Score mappings for scale questions.
@@ -151,6 +154,17 @@ public class ReportCompilationService {
 
         log.info("Report {} compiled for job {} with {} approved reviews",
                 report.getId(), job.getId(), approvedTasks.size());
+
+        // Notify creator that report is ready
+        notificationService.createNotification(
+                job.getCreator(),
+                NotificationType.REPORT_READY,
+                Map.of(
+                        "videoTitle", video.getTitle(),
+                        "reviewerCount", approvedTasks.size(),
+                        "jobId", job.getId()
+                )
+        );
 
         return report;
     }

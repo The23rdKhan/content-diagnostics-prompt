@@ -9,6 +9,8 @@ import com.contentdiagnostics.jobs.dto.SubmitVideoRequest;
 import com.contentdiagnostics.jobs.entity.Job;
 import com.contentdiagnostics.jobs.entity.JobStatus;
 import com.contentdiagnostics.jobs.repository.JobRepository;
+import com.contentdiagnostics.notifications.entity.NotificationType;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.contentdiagnostics.reports.entity.Report;
 import com.contentdiagnostics.reports.repository.ReportRepository;
 import com.contentdiagnostics.tasks.service.TaskCreationService;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -38,6 +41,7 @@ public class JobService {
     private final ReportRepository reportRepository;
     private final TaskCreationService taskCreationService;
     private final CreditService creditService;
+    private final NotificationService notificationService;
 
     /**
      * Get all jobs for a creator.
@@ -110,6 +114,13 @@ public class JobService {
         job = jobRepository.save(job);
 
         log.info("Job {} is now ready for review with {} tasks", job.getId(), job.getRequiredReviewers());
+
+        // Notify creator that video is being processed
+        notificationService.createNotification(
+                creator,
+                NotificationType.UPLOAD_RECEIVED,
+                Map.of("videoTitle", video.getTitle())
+        );
 
         return mapToDto(job);
     }

@@ -15,7 +15,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -29,6 +31,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final EmailPreferenceRepository emailPreferenceRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final EmailTemplateService emailTemplateService;
 
     /**
      * Get notifications for a user.
@@ -64,7 +67,44 @@ public class NotificationService {
     }
 
     /**
-     * Create a notification.
+     * Create a notification with context data for email templates.
+     * Email is sent asynchronously after transaction commits via event listener.
+     *
+     * @param user    the user to notify
+     * @param type    the notification type
+     * @param context context data for generating email content (e.g., "videoTitle", "amount")
+     */
+    @Transactional
+    public NotificationDto createNotification(User user, NotificationType type, Map<String, Object> context) {
+        // Generate content from template
+        EmailTemplateService.EmailContent content = emailTemplateService.generateContent(type, context);
+
+        Notification notification = Notification.builder()
+                .user(user)
+                .type(type)
+                .title(content.title())
+                .message(content.message())
+                .deepLink(content.deepLink())
+                .isRead(false)
+                .build();
+
+        notification = notificationRepository.save(notification);
+
+        log.info("Created notification {} ({}) for user {}", notification.getId(), type, user.getId());
+
+        // Publish event for async email sending (handled after transaction commits)
+        eventPublisher.publishEvent(NotificationCreatedEvent.builder()
+                .userId(user.getId())
+                .userEmail(user.getEmail())
+                .type(type)
+                .context(context)
+                .build());
+
+        return mapToDto(notification);
+    }
+
+    /**
+     * Create a notification with explicit title/message (for backward compatibility).
      * Email is sent asynchronously after transaction commits via event listener.
      */
     @Transactional
@@ -81,16 +121,15 @@ public class NotificationService {
 
         notification = notificationRepository.save(notification);
 
-        log.info("Created notification {} for user {}", notification.getId(), user.getId());
+        log.info("Created notification {} ({}) for user {}", notification.getId(), type, user.getId());
 
-        // Publish event for async email sending (handled after transaction commits)
+        // Publish event for async email sending with empty context
+        // (email template will use defaults)
         eventPublisher.publishEvent(NotificationCreatedEvent.builder()
                 .userId(user.getId())
                 .userEmail(user.getEmail())
                 .type(type)
-                .title(title)
-                .message(message)
-                .deepLink(deepLink)
+                .context(new HashMap<>())
                 .build());
 
         return mapToDto(notification);

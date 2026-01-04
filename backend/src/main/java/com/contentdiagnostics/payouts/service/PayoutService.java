@@ -3,6 +3,8 @@ package com.contentdiagnostics.payouts.service;
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
 import com.contentdiagnostics.common.exception.ValidationException;
+import com.contentdiagnostics.notifications.entity.NotificationType;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.contentdiagnostics.payouts.dto.PayoutDto;
 import com.contentdiagnostics.payouts.dto.RequestPayoutRequest;
 import com.contentdiagnostics.payouts.entity.Payout;
@@ -17,8 +19,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -30,14 +34,17 @@ public class PayoutService {
 
     private final PayoutRepository payoutRepository;
     private final ReviewerProfileRepository reviewerProfileRepository;
+    private final NotificationService notificationService;
     private final double minimumPayoutAmount;
 
     public PayoutService(
             PayoutRepository payoutRepository,
             ReviewerProfileRepository reviewerProfileRepository,
+            NotificationService notificationService,
             @Value("${app.payout.minimum-amount:10.0}") double minimumPayoutAmount) {
         this.payoutRepository = payoutRepository;
         this.reviewerProfileRepository = reviewerProfileRepository;
+        this.notificationService = notificationService;
         this.minimumPayoutAmount = minimumPayoutAmount;
     }
 
@@ -100,6 +107,13 @@ public class PayoutService {
         reviewerProfileRepository.save(profile);
 
         log.info("Payout requested: reviewer={}, amount={}", profile.getId(), amount);
+
+        // Notify reviewer that payout is processing
+        notificationService.createNotification(
+                user,
+                NotificationType.PAYOUT_PENDING,
+                Map.of("amount", BigDecimal.valueOf(amount))
+        );
 
         return toDto(saved);
     }
@@ -186,6 +200,17 @@ public class PayoutService {
         reviewerProfileRepository.save(reviewer);
 
         log.info("Payout released: id={}, transactionId={}", payoutId, transactionId);
+
+        // Notify reviewer that payout has been sent
+        notificationService.createNotification(
+                reviewer.getUser(),
+                NotificationType.PAYOUT_RELEASED,
+                Map.of(
+                        "amount", BigDecimal.valueOf(payout.getAmount()),
+                        "method", reviewer.getPayoutMethod() != null ? reviewer.getPayoutMethod() : "your payment method"
+                )
+        );
+
         return toDto(saved);
     }
 

@@ -14,6 +14,7 @@ import com.contentdiagnostics.credits.entity.CreditTransactionType;
 import com.contentdiagnostics.credits.service.CreditService;
 import com.contentdiagnostics.jobs.entity.JobStatus;
 import com.contentdiagnostics.jobs.repository.JobRepository;
+import com.contentdiagnostics.notifications.repository.EmailLogRepository;
 import com.contentdiagnostics.payouts.dto.PayoutDto;
 import com.contentdiagnostics.payouts.entity.Payout;
 import com.contentdiagnostics.payouts.entity.PayoutStatus;
@@ -79,6 +80,9 @@ class AdminServiceTest {
     @Mock
     private LanguagePoolSettingsRepository languagePoolSettingsRepository;
 
+    @Mock
+    private EmailLogRepository emailLogRepository;
+
     private AdminService adminService;
 
     private User testAdmin;
@@ -100,7 +104,8 @@ class AdminServiceTest {
                 payoutRepository,
                 auditService,
                 creditService,
-                languagePoolSettingsRepository
+                languagePoolSettingsRepository,
+                emailLogRepository
         );
 
         testAdmin = new User();

@@ -7,6 +7,8 @@ import com.contentdiagnostics.common.exception.ResourceNotFoundException;
 import com.contentdiagnostics.jobs.entity.Job;
 import com.contentdiagnostics.jobs.entity.JobStatus;
 import com.contentdiagnostics.jobs.repository.JobRepository;
+import com.contentdiagnostics.notifications.entity.NotificationType;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.contentdiagnostics.reports.service.ReportCompilationService;
 import com.contentdiagnostics.reviewers.entity.ReviewerProfile;
 import com.contentdiagnostics.workers.publisher.SqsPublisher;
@@ -29,9 +31,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -48,6 +52,7 @@ public class TaskService {
     private final ReportCompilationService reportCompilationService;
     private final SqsPublisher sqsPublisher;
     private final ObjectMapper objectMapper;
+    private final NotificationService notificationService;
 
     @Value("${app.task.lease-duration-minutes:10}")
     private int leaseDurationMinutes;
@@ -234,10 +239,33 @@ public class TaskService {
             );
             jobRepository.incrementCompletedReviewers(task.getJob().getId());
             log.info("Task {} approved", taskId);
+
+            // Notify reviewer of approval
+            // Calculate new balance: pending earnings + this task's pay
+            BigDecimal amount = BigDecimal.valueOf(task.getPayAmount());
+            BigDecimal newBalance = BigDecimal.valueOf(reviewer.getPendingEarnings() + task.getPayAmount());
+            notificationService.createNotification(
+                    reviewer.getUser(),
+                    NotificationType.TASK_APPROVED,
+                    Map.of(
+                            "amount", amount,
+                            "totalBalance", newBalance
+                    )
+            );
         } else {
             taskRepository.rejectTask(taskId, reviewedAt, rejectionReason, attentionPassed);
             reviewerProfileRepository.recordRejection(reviewer.getId(), scoreDecreaseOnReject);
             log.info("Task {} rejected: {}", taskId, rejectionReason);
+
+            // Notify reviewer of rejection
+            notificationService.createNotification(
+                    reviewer.getUser(),
+                    NotificationType.TASK_REJECTED,
+                    Map.of(
+                            "reason", rejectionReason,
+                            "taskId", taskId
+                    )
+            );
         }
 
         // Check if job is complete and trigger report compilation

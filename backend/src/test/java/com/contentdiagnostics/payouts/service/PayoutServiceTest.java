@@ -9,6 +9,7 @@ import com.contentdiagnostics.payouts.dto.RequestPayoutRequest;
 import com.contentdiagnostics.payouts.entity.Payout;
 import com.contentdiagnostics.payouts.entity.PayoutStatus;
 import com.contentdiagnostics.payouts.repository.PayoutRepository;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.contentdiagnostics.reviewers.entity.PayoutMethod;
 import com.contentdiagnostics.reviewers.entity.ReviewerProfile;
 import com.contentdiagnostics.reviewers.repository.ReviewerProfileRepository;
@@ -41,6 +42,9 @@ class PayoutServiceTest {
     @Mock
     private ReviewerProfileRepository reviewerProfileRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     private PayoutService payoutService;
 
     private User testUser;
@@ -50,7 +54,7 @@ class PayoutServiceTest {
     @BeforeEach
     void setUp() {
         // Manually create service with test config value
-        payoutService = new PayoutService(payoutRepository, reviewerProfileRepository, 10.0);
+        payoutService = new PayoutService(payoutRepository, reviewerProfileRepository, notificationService, 10.0);
 
         testUser = new User();
         testUser.setId(1L);

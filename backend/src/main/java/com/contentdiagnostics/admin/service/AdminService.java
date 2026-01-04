@@ -7,6 +7,7 @@ import com.contentdiagnostics.audit.service.AuditService;
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.auth.entity.UserRole;
 import com.contentdiagnostics.auth.repository.UserRepository;
+import com.contentdiagnostics.common.dto.PagedResponse;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
 import com.contentdiagnostics.common.util.SecurityUtils;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
@@ -15,6 +16,12 @@ import com.contentdiagnostics.credits.entity.CreditTransactionType;
 import com.contentdiagnostics.credits.service.CreditService;
 import com.contentdiagnostics.jobs.entity.JobStatus;
 import com.contentdiagnostics.jobs.repository.JobRepository;
+import com.contentdiagnostics.notifications.dto.EmailLogDto;
+import com.contentdiagnostics.notifications.dto.EmailStatsDto;
+import com.contentdiagnostics.notifications.entity.EmailLog;
+import com.contentdiagnostics.notifications.entity.EmailLog.EmailStatus;
+import com.contentdiagnostics.notifications.entity.NotificationType;
+import com.contentdiagnostics.notifications.repository.EmailLogRepository;
 import com.contentdiagnostics.payouts.dto.PayoutDto;
 import com.contentdiagnostics.payouts.entity.Payout;
 import com.contentdiagnostics.payouts.entity.PayoutStatus;
@@ -33,6 +40,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +66,7 @@ public class AdminService {
     private final AuditService auditService;
     private final CreditService creditService;
     private final LanguagePoolSettingsRepository languagePoolSettingsRepository;
+    private final EmailLogRepository emailLogRepository;
 
     /**
      * Get KPI dashboard data.
@@ -451,5 +462,88 @@ public class AdminService {
                 .createdAt(payout.getCreatedAt())
                 .releasedAt(payout.getReleasedAt())
                 .build();
+    }
+
+    // ==================== Email Log Methods ====================
+
+    /**
+     * Get email statistics for the dashboard.
+     */
+    @Transactional(readOnly = true)
+    public EmailStatsDto getEmailStats() {
+        long totalSent = emailLogRepository.countByStatus(EmailStatus.SENT);
+        long totalFailed = emailLogRepository.countByStatus(EmailStatus.FAILED);
+        long totalSkipped = emailLogRepository.countByStatus(EmailStatus.SKIPPED);
+
+        // Get today's start in UTC
+        Instant todayStart = LocalDate.now(ZoneId.of("UTC"))
+                .atStartOfDay(ZoneId.of("UTC"))
+                .toInstant();
+
+        long sentToday = emailLogRepository.countSentToday(todayStart);
+        long failedToday = emailLogRepository.countFailedToday(todayStart);
+
+        // Calculate delivery rate
+        long totalAttempted = totalSent + totalFailed;
+        double deliveryRate = totalAttempted > 0 ? (double) totalSent / totalAttempted * 100 : 100.0;
+
+        // Get breakdown by notification type
+        Map<String, Long> byType = Arrays.stream(NotificationType.values())
+                .collect(Collectors.toMap(
+                        NotificationType::name,
+                        type -> emailLogRepository.countByNotificationType(type)
+                ));
+
+        // Get breakdown by status
+        Map<String, Long> byStatus = Arrays.stream(EmailStatus.values())
+                .collect(Collectors.toMap(
+                        EmailStatus::name,
+                        emailLogRepository::countByStatus
+                ));
+
+        return EmailStatsDto.builder()
+                .totalSent(totalSent)
+                .totalFailed(totalFailed)
+                .totalSkipped(totalSkipped)
+                .sentToday(sentToday)
+                .failedToday(failedToday)
+                .deliveryRate(deliveryRate)
+                .byType(byType)
+                .byStatus(byStatus)
+                .build();
+    }
+
+    /**
+     * Get email logs with optional filters.
+     */
+    @Transactional(readOnly = true)
+    public PagedResponse<EmailLogDto> getEmailLogs(int page, int size,
+                                                    EmailStatus status,
+                                                    NotificationType type,
+                                                    String email) {
+        Page<EmailLog> logs = emailLogRepository.searchEmails(status, type, email, PageRequest.of(page, size));
+
+        List<EmailLogDto> content = logs.getContent().stream()
+                .map(EmailLogDto::fromEntity)
+                .collect(Collectors.toList());
+
+        return PagedResponse.<EmailLogDto>builder()
+                .content(content)
+                .page(logs.getNumber())
+                .size(logs.getSize())
+                .totalElements(logs.getTotalElements())
+                .totalPages(logs.getTotalPages())
+                .last(logs.isLast())
+                .build();
+    }
+
+    /**
+     * Get a single email log by ID.
+     */
+    @Transactional(readOnly = true)
+    public EmailLogDto getEmailLog(Long id) {
+        EmailLog log = emailLogRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("EmailLog", id.toString()));
+        return EmailLogDto.fromEntity(log);
     }
 }

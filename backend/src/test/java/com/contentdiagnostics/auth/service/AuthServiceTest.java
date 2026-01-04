@@ -13,6 +13,7 @@ import com.contentdiagnostics.common.exception.ConflictException;
 import com.contentdiagnostics.common.exception.UnauthorizedException;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
+import com.contentdiagnostics.notifications.service.NotificationService;
 import com.contentdiagnostics.reviewers.entity.ReviewerProfile;
 import com.contentdiagnostics.reviewers.repository.ReviewerProfileRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,6 +64,9 @@ class AuthServiceTest {
 
     @Mock
     private AuthenticationManager authenticationManager;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private AuthService authService;
