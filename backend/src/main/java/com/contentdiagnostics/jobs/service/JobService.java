@@ -124,6 +124,46 @@ public class JobService {
         return mapToDto(job);
     }
 
+    /**
+     * Cancel a job and refund credits.
+     */
+    @Transactional
+    public JobDto cancelJob(User user, Long jobId) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Job", jobId.toString()));
+
+        // Verify ownership
+        if (!job.getCreator().getId().equals(user.getId())) {
+            throw new BadRequestException("Not authorized to cancel this job");
+        }
+
+        // Check if cancellable
+        if (!isCancellable(job.getStatus())) {
+            throw new BadRequestException("Job cannot be cancelled in status: " + job.getStatus());
+        }
+
+        // Update status to CANCELLED
+        jobRepository.updateStatus(jobId, JobStatus.CANCELLED);
+
+        // Refund credits
+        creditService.refundCredits(user, jobId, CreditService.CREDITS_PER_VIDEO, "Job cancelled by user");
+
+        // Return updated job
+        job.setStatus(JobStatus.CANCELLED);
+        return mapToDto(job);
+    }
+
+    /**
+     * Check if a job can be cancelled based on its status.
+     */
+    private boolean isCancellable(JobStatus status) {
+        return status == JobStatus.UPLOADING
+            || status == JobStatus.UPLOADED
+            || status == JobStatus.PROCESSING
+            || status == JobStatus.SEGMENTED
+            || status == JobStatus.IN_REVIEW;
+    }
+
     // --- Helper methods ---
 
     private JobDto mapToDto(Job job) {

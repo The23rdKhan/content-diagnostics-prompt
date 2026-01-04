@@ -147,6 +147,15 @@ public class CreditService {
     }
 
     /**
+     * Refund credits for cancelled job (by User).
+     */
+    @Transactional
+    public CreditTransaction refundCredits(User user, Long jobId, int credits, String reason) {
+        CreatorProfile creator = getCreatorProfile(user);
+        return refundCredits(creator, jobId, credits, reason);
+    }
+
+    /**
      * Refund credits for cancelled job.
      */
     @Transactional
@@ -205,7 +214,18 @@ public class CreditService {
      */
     @Transactional(readOnly = true)
     public boolean isPaymentAlreadyProcessed(String paymentIntentId) {
-        return transactionRepository.findByStripePaymentIntentId(paymentIntentId).isPresent();
+        return isExternalTransactionProcessed(paymentIntentId);
+    }
+
+    /**
+     * Check if a credit transaction has already been recorded for an external reference.
+     */
+    @Transactional(readOnly = true)
+    public boolean isExternalTransactionProcessed(String referenceId) {
+        if (referenceId == null || referenceId.isEmpty()) {
+            return false;
+        }
+        return transactionRepository.findByStripePaymentIntentId(referenceId).isPresent();
     }
 
     // --- Private helpers ---
@@ -237,5 +257,40 @@ public class CreditService {
                 .description(tx.getDescription())
                 .createdAt(tx.getCreatedAt())
                 .build();
+    }
+
+    public int getCreditsForPlanTier(String planTier) {
+        if (planTier == null) {
+            return 15;
+        }
+        return switch (planTier.toLowerCase()) {
+            case "professional" -> 50;
+            case "enterprise" -> 250;
+            default -> 15;
+        };
+    }
+
+    /**
+     * Add subscription credits based on plan tier.
+     */
+    @Transactional
+    public CreditTransaction addSubscriptionCredits(CreatorProfile creator, String planTier, String referenceId) {
+        int credits = getCreditsForPlanTier(planTier);
+        int newBalance = creator.getRemainingCredits() + credits;
+        creatorProfileRepository.addCredits(creator.getId(), credits);
+        creator.setRemainingCredits(newBalance);
+
+        CreditTransaction tx = CreditTransaction.builder()
+                .creator(creator)
+                .type(CreditTransactionType.SUBSCRIPTION)
+                .amount(credits)
+                .balanceAfter(newBalance)
+                .description("Subscription credits - " + (planTier == null ? "basic" : planTier))
+                .stripePaymentIntentId(referenceId)
+                .build();
+
+        log.info("Added {} subscription credits for creator {} on plan {}", credits, creator.getId(), planTier);
+
+        return transactionRepository.save(tx);
     }
 }

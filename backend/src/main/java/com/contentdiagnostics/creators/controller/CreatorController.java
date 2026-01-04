@@ -160,6 +160,18 @@ public class CreatorController {
     }
 
     /**
+     * Cancel a job and refund credits.
+     * POST /api/creator/jobs/{jobId}/cancel
+     */
+    @PostMapping("/jobs/{jobId}/cancel")
+    public ResponseEntity<ApiResponse<JobDto>> cancelJob(@PathVariable Long jobId) {
+        User user = SecurityUtils.getCurrentUser();
+        JobDto job = jobService.cancelJob(user, jobId);
+
+        return ResponseEntity.ok(ApiResponse.success("Job cancelled and credits refunded", job));
+    }
+
+    /**
      * Get all reports for current creator.
      * GET /api/creator/reports
      */
