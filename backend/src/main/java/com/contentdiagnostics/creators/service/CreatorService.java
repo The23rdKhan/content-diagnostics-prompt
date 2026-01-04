@@ -9,6 +9,7 @@ import com.contentdiagnostics.creators.dto.UpdateCreatorProfileRequest;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
 import com.contentdiagnostics.credits.service.CreditService;
+import com.contentdiagnostics.jobs.repository.JobRepository;
 import com.contentdiagnostics.plans.service.PlanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,7 @@ public class CreatorService {
     private final CreatorProfileRepository creatorProfileRepository;
     private final CreditService creditService;
     private final PlanService planService;
+    private final JobRepository jobRepository;
 
     /**
      * Get profile for the current user.
@@ -185,8 +187,11 @@ public class CreatorService {
                 .orElse(getAvailablePlans().get(0));
 
         boolean hasSubscription = profile.getStripeSubscriptionId() != null;
-        Instant periodStart = profile.getCreatedAt();
-        Instant periodEnd = periodStart.plus(30, ChronoUnit.DAYS);
+        Instant periodStart = Instant.now().minus(30, ChronoUnit.DAYS);
+        Instant periodEnd = Instant.now();
+
+        // Calculate videos submitted this billing period
+        long videosThisMonth = jobRepository.countByCreatorSince(user, periodStart);
 
         return SubscriptionDto.builder()
                 .planId(plan.getId())
@@ -197,7 +202,7 @@ public class CreatorService {
                 .currentPeriodStart(periodStart)
                 .currentPeriodEnd(periodEnd)
                 .remainingCredits(profile.getRemainingCredits())
-                .videosThisMonth(0) // TODO: Calculate from jobs
+                .videosThisMonth((int) videosThisMonth)
                 .videosLimit(plan.getVideosPerMonth())
                 .cancelAtPeriodEnd(false)
                 .stripeCustomerId(profile.getStripeCustomerId())

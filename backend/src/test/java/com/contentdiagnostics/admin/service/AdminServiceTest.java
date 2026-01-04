@@ -1,6 +1,8 @@
 package com.contentdiagnostics.admin.service;
 
 import com.contentdiagnostics.admin.dto.*;
+import com.contentdiagnostics.admin.entity.LanguagePoolSettings;
+import com.contentdiagnostics.admin.repository.LanguagePoolSettingsRepository;
 import com.contentdiagnostics.audit.service.AuditService;
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.auth.entity.UserRole;
@@ -74,7 +76,9 @@ class AdminServiceTest {
     @Mock
     private CreditService creditService;
 
-    @InjectMocks
+    @Mock
+    private LanguagePoolSettingsRepository languagePoolSettingsRepository;
+
     private AdminService adminService;
 
     private User testAdmin;
@@ -86,6 +90,19 @@ class AdminServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Manually construct AdminService with all dependencies
+        adminService = new AdminService(
+                userRepository,
+                creatorProfileRepository,
+                reviewerProfileRepository,
+                jobRepository,
+                taskRepository,
+                payoutRepository,
+                auditService,
+                creditService,
+                languagePoolSettingsRepository
+        );
+
         testAdmin = new User();
         testAdmin.setId(1L);
         testAdmin.setEmail("admin@example.com");
@@ -177,8 +194,21 @@ class AdminServiceTest {
     class GetCapacity {
 
         @Test
-        @DisplayName("should return English language pool data")
-        void shouldReturnEnglishPoolData() {
+        @DisplayName("should return language pool data from repository")
+        void shouldReturnLanguagePoolData() {
+            LanguagePoolSettings englishPool = LanguagePoolSettings.builder()
+                    .id(1L)
+                    .languageCode("en")
+                    .displayName("English (Global)")
+                    .currentSla("24h")
+                    .maxReviewersPerVideo(5)
+                    .checkoutEnabled(true)
+                    .liveAddonEnabled(true)
+                    .active(true)
+                    .build();
+
+            when(languagePoolSettingsRepository.findByActiveTrueOrderByDisplayNameAsc())
+                    .thenReturn(List.of(englishPool));
             when(reviewerProfileRepository.countActiveByLanguage("English")).thenReturn(25L);
             when(jobRepository.countActiveByLanguage("English")).thenReturn(10L);
 
@@ -188,6 +218,7 @@ class AdminServiceTest {
             assertThat(capacity.getLanguagePools().get(0).getCode()).isEqualTo("en");
             assertThat(capacity.getLanguagePools().get(0).getActiveReviewers()).isEqualTo(25);
             assertThat(capacity.getLanguagePools().get(0).getPendingTasks()).isEqualTo(10);
+            assertThat(capacity.getLanguagePools().get(0).getCurrentSLA()).isEqualTo("24h");
         }
     }
 

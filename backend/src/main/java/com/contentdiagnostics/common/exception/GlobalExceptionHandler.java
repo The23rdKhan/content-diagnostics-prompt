@@ -1,5 +1,6 @@
 package com.contentdiagnostics.common.exception;
 
+import com.contentdiagnostics.billing.exception.InvoicePdfGenerationException;
 import com.contentdiagnostics.common.dto.ApiResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -143,6 +144,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.error("Access denied", "FORBIDDEN"));
+    }
+
+    /**
+     * Handle invoice PDF generation failures.
+     */
+    @ExceptionHandler(InvoicePdfGenerationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvoicePdfGenerationException(
+            InvoicePdfGenerationException ex) {
+
+        log.error("Invoice PDF generation failed for invoice {}: {}",
+                ex.getInvoiceNumber(), ex.getMessage());
+
+        Map<String, String> details = new HashMap<>();
+        details.put("invoiceNumber", ex.getInvoiceNumber());
+
+        ApiResponse.ErrorDetails errorDetails = ApiResponse.ErrorDetails.builder()
+                .code("PDF_GENERATION_FAILED")
+                .message("Failed to generate invoice PDF. Please try again or contact support.")
+                .details(details)
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(errorDetails));
     }
 
     /**

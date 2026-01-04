@@ -1,6 +1,8 @@
 package com.contentdiagnostics.admin.service;
 
 import com.contentdiagnostics.admin.dto.*;
+import com.contentdiagnostics.admin.entity.LanguagePoolSettings;
+import com.contentdiagnostics.admin.repository.LanguagePoolSettingsRepository;
 import com.contentdiagnostics.audit.service.AuditService;
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.auth.entity.UserRole;
@@ -19,6 +21,8 @@ import com.contentdiagnostics.payouts.entity.PayoutStatus;
 import com.contentdiagnostics.payouts.repository.PayoutRepository;
 import com.contentdiagnostics.reviewers.entity.ReviewerProfile;
 import com.contentdiagnostics.reviewers.repository.ReviewerProfileRepository;
+import com.contentdiagnostics.tasks.dto.TaskDto;
+import com.contentdiagnostics.tasks.entity.Task;
 import com.contentdiagnostics.tasks.entity.TaskStatus;
 import com.contentdiagnostics.tasks.repository.TaskRepository;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +55,7 @@ public class AdminService {
     private final PayoutRepository payoutRepository;
     private final AuditService auditService;
     private final CreditService creditService;
+    private final LanguagePoolSettingsRepository languagePoolSettingsRepository;
 
     /**
      * Get KPI dashboard data.
@@ -85,26 +90,139 @@ public class AdminService {
      */
     @Transactional(readOnly = true)
     public CapacityResponse getCapacity() {
-        // For MVP, English only
-        long activeEnglish = reviewerProfileRepository.countActiveByLanguage("English");
-        long pendingEnglish = jobRepository.countActiveByLanguage("English");
+        List<LanguagePoolSettings> settings = languagePoolSettingsRepository.findByActiveTrueOrderByDisplayNameAsc();
 
-        CapacityResponse.LanguagePoolCapacity english = CapacityResponse.LanguagePoolCapacity.builder()
-                .id("1")
-                .name("English (Global)")
-                .code("en")
-                .capacityScore(85)
-                .currentSLA("24h")
-                .maxReviewersPerVideo(5)
-                .checkoutEnabled(true)
-                .liveAddOnEnabled(true)
-                .activeReviewers(activeEnglish)
-                .pendingTasks(pendingEnglish)
-                .avgDeliveryTime("18h")
-                .build();
+        List<CapacityResponse.LanguagePoolCapacity> pools = settings.stream()
+                .map(this::mapToCapacityDto)
+                .collect(Collectors.toList());
 
         return CapacityResponse.builder()
-                .languagePools(List.of(english))
+                .languagePools(pools)
+                .build();
+    }
+
+    /**
+     * Update capacity settings for a language pool.
+     */
+    @Transactional
+    public CapacityResponse.LanguagePoolCapacity updateCapacity(String languageCode, UpdateCapacityRequest request) {
+        User admin = SecurityUtils.getCurrentUser();
+        LanguagePoolSettings settings = languagePoolSettingsRepository.findByLanguageCode(languageCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Language pool", languageCode));
+
+        // Capture old values for audit
+        Map<String, Object> oldValues = new HashMap<>();
+        oldValues.put("currentSla", settings.getCurrentSla());
+        oldValues.put("maxReviewersPerVideo", settings.getMaxReviewersPerVideo());
+        oldValues.put("checkoutEnabled", settings.getCheckoutEnabled());
+        oldValues.put("liveAddonEnabled", settings.getLiveAddonEnabled());
+
+        // Apply updates
+        if (request.getCurrentSLA() != null) {
+            settings.setCurrentSla(request.getCurrentSLA());
+        }
+        if (request.getMaxReviewersPerVideo() != null) {
+            settings.setMaxReviewersPerVideo(request.getMaxReviewersPerVideo());
+        }
+        if (request.getCheckoutEnabled() != null) {
+            settings.setCheckoutEnabled(request.getCheckoutEnabled());
+        }
+        if (request.getLiveAddOnEnabled() != null) {
+            settings.setLiveAddonEnabled(request.getLiveAddOnEnabled());
+        }
+
+        settings = languagePoolSettingsRepository.save(settings);
+
+        // Capture new values for audit
+        Map<String, Object> newValues = new HashMap<>();
+        newValues.put("currentSla", settings.getCurrentSla());
+        newValues.put("maxReviewersPerVideo", settings.getMaxReviewersPerVideo());
+        newValues.put("checkoutEnabled", settings.getCheckoutEnabled());
+        newValues.put("liveAddonEnabled", settings.getLiveAddonEnabled());
+
+        // Audit log the change
+        auditService.recordAdminAction(
+                admin,
+                "CAPACITY_UPDATE",
+                "LANGUAGE_POOL",
+                settings.getId(),
+                String.format("Updated capacity for %s", settings.getDisplayName()),
+                oldValues,
+                newValues
+        );
+
+        log.info("Admin updated capacity for language pool {}", languageCode);
+
+        return mapToCapacityDto(settings);
+    }
+
+    private CapacityResponse.LanguagePoolCapacity mapToCapacityDto(LanguagePoolSettings settings) {
+        // Get live stats for this language
+        String languageName = settings.getDisplayName().contains("(")
+                ? settings.getDisplayName().substring(0, settings.getDisplayName().indexOf("(")).trim()
+                : settings.getDisplayName();
+        long activeReviewers = reviewerProfileRepository.countActiveByLanguage(languageName);
+        long pendingTasks = jobRepository.countActiveByLanguage(languageName);
+
+        // Calculate capacity score (0-100) based on reviewer availability
+        int capacityScore = calculateCapacityScore(activeReviewers, pendingTasks);
+
+        return CapacityResponse.LanguagePoolCapacity.builder()
+                .id(settings.getId().toString())
+                .name(settings.getDisplayName())
+                .code(settings.getLanguageCode())
+                .capacityScore(capacityScore)
+                .currentSLA(settings.getCurrentSla())
+                .maxReviewersPerVideo(settings.getMaxReviewersPerVideo())
+                .checkoutEnabled(settings.getCheckoutEnabled())
+                .liveAddOnEnabled(settings.getLiveAddonEnabled())
+                .activeReviewers(activeReviewers)
+                .pendingTasks(pendingTasks)
+                .avgDeliveryTime(calculateAvgDeliveryTime(settings.getCurrentSla()))
+                .build();
+    }
+
+    private int calculateCapacityScore(long activeReviewers, long pendingTasks) {
+        if (activeReviewers == 0) return 0;
+        if (pendingTasks == 0) return 100;
+        // Simple ratio-based score
+        double ratio = (double) activeReviewers / Math.max(pendingTasks, 1);
+        return (int) Math.min(100, Math.max(0, ratio * 50));
+    }
+
+    private String calculateAvgDeliveryTime(String sla) {
+        // Estimate avg delivery as ~75% of SLA
+        return switch (sla) {
+            case "24h" -> "18h";
+            case "48h" -> "36h";
+            case "72h" -> "54h";
+            default -> "24h";
+        };
+    }
+
+    /**
+     * Get all tasks for admin view.
+     */
+    @Transactional(readOnly = true)
+    public List<TaskDto> getTasks(int page, int size) {
+        Page<Task> tasks = taskRepository.findAll(PageRequest.of(page, size));
+        return tasks.stream().map(this::mapTaskToDto).collect(Collectors.toList());
+    }
+
+    private TaskDto mapTaskToDto(Task task) {
+        return TaskDto.builder()
+                .id(task.getId())
+                .status(task.getStatus())
+                .language(task.getLanguage())
+                .segmentTimestamp(task.getSegmentTimestamp())
+                .segmentDurationSeconds(task.getSegmentDuration())
+                .payAmount(task.getPayAmount())
+                .videoSegmentUrl(task.getVideoSegmentUrl())
+                .leaseExpiresAt(task.getLeaseExpiresAt())
+                .submittedAt(task.getSubmittedAt())
+                .reviewedAt(task.getReviewedAt())
+                .rejectionReason(task.getRejectionReason())
+                .createdAt(task.getCreatedAt())
                 .build();
     }
 

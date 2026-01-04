@@ -51,13 +51,12 @@ public class AdminController {
      * PUT /api/admin/capacity/{languagePool}
      */
     @PutMapping("/capacity/{languagePool}")
-    public ResponseEntity<ApiResponse<Void>> updateCapacity(
+    public ResponseEntity<ApiResponse<CapacityResponse.LanguagePoolCapacity>> updateCapacity(
             @PathVariable String languagePool,
             @Valid @RequestBody UpdateCapacityRequest request) {
 
-        // TODO: Implement capacity update
-        log.info("Updating capacity for language pool: {}", languagePool);
-        return ResponseEntity.ok(ApiResponse.success("Capacity updated"));
+        CapacityResponse.LanguagePoolCapacity updated = adminService.updateCapacity(languagePool, request);
+        return ResponseEntity.ok(ApiResponse.success("Capacity updated", updated));
     }
 
     /**
@@ -69,8 +68,8 @@ public class AdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
 
-        // TODO: Implement admin task list
-        return ResponseEntity.ok(ApiResponse.success(List.of()));
+        List<TaskDto> tasks = adminService.getTasks(page, size);
+        return ResponseEntity.ok(ApiResponse.success(tasks));
     }
 
     /**

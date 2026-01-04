@@ -108,4 +108,10 @@ public interface JobRepository extends JpaRepository<Job, Long> {
      */
     @Query("SELECT COUNT(j) FROM Job j WHERE j.status IN :statuses")
     long countByStatusIn(@Param("statuses") List<JobStatus> statuses);
+
+    /**
+     * Count jobs created by a user since a given date.
+     */
+    @Query("SELECT COUNT(j) FROM Job j WHERE j.creator = :creator AND j.createdAt >= :since")
+    long countByCreatorSince(@Param("creator") User creator, @Param("since") Instant since);
 }

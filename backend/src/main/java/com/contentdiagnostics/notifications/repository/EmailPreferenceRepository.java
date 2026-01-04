@@ -17,4 +17,9 @@ public interface EmailPreferenceRepository extends JpaRepository<EmailPreference
      * Find preferences by user.
      */
     Optional<EmailPreference> findByUser(User user);
+
+    /**
+     * Find preferences by user ID (for async event handling).
+     */
+    Optional<EmailPreference> findByUserId(Long userId);
 }

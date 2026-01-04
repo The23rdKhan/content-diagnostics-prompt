@@ -6,10 +6,12 @@ import com.contentdiagnostics.notifications.dto.NotificationDto;
 import com.contentdiagnostics.notifications.entity.EmailPreference;
 import com.contentdiagnostics.notifications.entity.Notification;
 import com.contentdiagnostics.notifications.entity.NotificationType;
+import com.contentdiagnostics.notifications.event.NotificationCreatedEvent;
 import com.contentdiagnostics.notifications.repository.EmailPreferenceRepository;
 import com.contentdiagnostics.notifications.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final EmailPreferenceRepository emailPreferenceRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Get notifications for a user.
@@ -62,6 +65,7 @@ public class NotificationService {
 
     /**
      * Create a notification.
+     * Email is sent asynchronously after transaction commits via event listener.
      */
     @Transactional
     public NotificationDto createNotification(User user, NotificationType type, String title,
@@ -79,7 +83,15 @@ public class NotificationService {
 
         log.info("Created notification {} for user {}", notification.getId(), user.getId());
 
-        // TODO: Check email preferences and send email if enabled
+        // Publish event for async email sending (handled after transaction commits)
+        eventPublisher.publishEvent(NotificationCreatedEvent.builder()
+                .userId(user.getId())
+                .userEmail(user.getEmail())
+                .type(type)
+                .title(title)
+                .message(message)
+                .deepLink(deepLink)
+                .build());
 
         return mapToDto(notification);
     }

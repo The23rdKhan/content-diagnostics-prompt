@@ -6,6 +6,7 @@ import com.contentdiagnostics.billing.dto.InvoiceDto;
 import com.contentdiagnostics.billing.dto.PaymentMethodDto;
 import com.contentdiagnostics.billing.entity.Invoice;
 import com.contentdiagnostics.billing.service.BillingService;
+import com.contentdiagnostics.billing.service.InvoicePdfService;
 import com.contentdiagnostics.common.dto.ApiResponse;
 import com.contentdiagnostics.common.dto.PagedResponse;
 import com.contentdiagnostics.common.util.SecurityUtils;
@@ -31,6 +32,7 @@ import java.util.Map;
 public class CreatorBillingController {
 
     private final BillingService billingService;
+    private final InvoicePdfService invoicePdfService;
 
     /**
      * Get billing summary.
@@ -86,15 +88,18 @@ public class CreatorBillingController {
         User user = SecurityUtils.getCurrentUser();
         Invoice invoice = billingService.getInvoice(user, invoiceId);
 
-        // In production, fetch PDF from Stripe or generate it
-        // For now, return a placeholder response
-        String placeholder = "Invoice PDF placeholder for invoice " + invoice.getInvoiceNumber();
+        // Generate PDF using the invoice service
+        byte[] pdfBytes = invoicePdfService.generateInvoicePdf(
+                invoice,
+                user.getEmail(),
+                user.getEmail()
+        );
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"invoice-" + invoice.getInvoiceNumber() + ".pdf\"")
                 .contentType(MediaType.APPLICATION_PDF)
-                .body(placeholder.getBytes());
+                .body(pdfBytes);
     }
 
     /**

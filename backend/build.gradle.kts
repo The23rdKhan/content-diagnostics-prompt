@@ -56,6 +56,9 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
 
+    // PDF Generation
+    implementation("com.github.librepdf:openpdf:1.3.43")
+
     // Logging (structured JSON)
     implementation("net.logstash.logback:logstash-logback-encoder:7.4")
 
