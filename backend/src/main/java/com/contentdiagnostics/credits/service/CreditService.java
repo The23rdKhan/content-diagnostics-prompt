@@ -201,6 +201,28 @@ public class CreditService {
     }
 
     /**
+     * Issue admin credits (support, compensation, etc).
+     */
+    @Transactional
+    public CreditTransaction issueAdminCredits(CreatorProfile creator, int credits, String reason) {
+        int newBalance = creator.getRemainingCredits() + credits;
+        creatorProfileRepository.addCredits(creator.getId(), credits);
+
+        CreditTransaction tx = CreditTransaction.builder()
+                .creator(creator)
+                .type(CreditTransactionType.ADMIN_ISSUE)
+                .amount(credits)
+                .balanceAfter(newBalance)
+                .description("Admin issued: " + (reason != null ? reason : "No reason"))
+                .reason(reason)
+                .build();
+
+        log.info("Admin issued {} credits to creator {}: {}", credits, creator.getId(), reason);
+
+        return transactionRepository.save(tx);
+    }
+
+    /**
      * Check if user has enough credits for a video submission.
      */
     @Transactional(readOnly = true)

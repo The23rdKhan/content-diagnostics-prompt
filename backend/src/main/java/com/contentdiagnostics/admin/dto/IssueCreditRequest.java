@@ -1,5 +1,6 @@
 package com.contentdiagnostics.admin.dto;
 
+import com.contentdiagnostics.credits.entity.CreditTransactionType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -21,4 +22,10 @@ public class IssueCreditRequest {
     private Integer credits;
 
     private String reason;
+
+    /**
+     * Type of credit transaction. Defaults to ADMIN_ISSUE if not specified.
+     * Allowed values: ADMIN_ISSUE, PROMO
+     */
+    private CreditTransactionType type;
 }

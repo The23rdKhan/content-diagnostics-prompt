@@ -18,6 +18,13 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useAdminCreators, useAdminCreatorStats, useGrantCredit, type AdminCreatorDto } from "@/lib/hooks/use-admin"
 import { trackEvent } from "@/lib/analytics"
 import { Search, ExternalLink, DollarSign, AlertCircle, RefreshCw, Loader2 } from "lucide-react"
@@ -33,6 +40,7 @@ export default function CreatorsPage() {
   const [selectedCreator, setSelectedCreator] = useState<AdminCreatorDto | null>(null)
   const [creditAmount, setCreditAmount] = useState(100)
   const [creditReason, setCreditReason] = useState("")
+  const [creditType, setCreditType] = useState<"ADMIN_ISSUE" | "PROMO">("ADMIN_ISSUE")
 
   // Debounce search input
   useEffect(() => {
@@ -53,6 +61,7 @@ export default function CreatorsPage() {
     setSelectedCreator(creator)
     setCreditAmount(100)
     setCreditReason("")
+    setCreditType("ADMIN_ISSUE")
     setCreditDialogOpen(true)
   }
 
@@ -60,10 +69,11 @@ export default function CreatorsPage() {
     if (!selectedCreator) return
 
     try {
-      await grantCredit(selectedCreator.id, creditAmount, creditReason || undefined)
+      await grantCredit(selectedCreator.id, creditAmount, creditReason || undefined, creditType)
       trackEvent("admin_credit_granted", {
         creatorId: selectedCreator.id,
         amount: creditAmount,
+        type: creditType,
       })
       setCreditDialogOpen(false)
       refetch()
@@ -285,6 +295,19 @@ export default function CreatorsPage() {
                   max={10000}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="type">Credit Type</Label>
+              <Select value={creditType} onValueChange={(v) => setCreditType(v as "ADMIN_ISSUE" | "PROMO")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ADMIN_ISSUE">Admin Credit (support, compensation)</SelectItem>
+                  <SelectItem value="PROMO">Promotional Credit (campaigns, bonuses)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

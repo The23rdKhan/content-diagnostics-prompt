@@ -347,15 +347,17 @@ export function useGrantCredit() {
   const grantCredit = useCallback(async (
     creatorId: number,
     amount: number,
-    reason?: string
+    reason?: string,
+    type?: "ADMIN_ISSUE" | "PROMO"
   ): Promise<{ newBalance: number }> => {
     setLoading(true)
     setError(null)
 
     try {
       const result = await api.post<{ newBalance: number }>(`/admin/creators/${creatorId}/credit`, {
-        amount,
+        credits: amount,
         reason,
+        type,
       })
       return result
     } catch (err) {

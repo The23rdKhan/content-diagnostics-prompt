@@ -9,6 +9,8 @@ import com.contentdiagnostics.common.exception.ResourceNotFoundException;
 import com.contentdiagnostics.common.util.SecurityUtils;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
+import com.contentdiagnostics.credits.entity.CreditTransactionType;
+import com.contentdiagnostics.credits.service.CreditService;
 import com.contentdiagnostics.jobs.entity.JobStatus;
 import com.contentdiagnostics.jobs.repository.JobRepository;
 import com.contentdiagnostics.payouts.dto.PayoutDto;
@@ -48,6 +50,7 @@ public class AdminService {
     private final TaskRepository taskRepository;
     private final PayoutRepository payoutRepository;
     private final AuditService auditService;
+    private final CreditService creditService;
 
     /**
      * Get KPI dashboard data.
@@ -190,14 +193,28 @@ public class AdminService {
                 .orElseThrow(() -> new ResourceNotFoundException("Creator", creatorId.toString()));
 
         int oldCredits = profile.getRemainingCredits();
-        creatorProfileRepository.addCredits(profile.getId(), request.getCredits());
-        profile.setRemainingCredits(profile.getRemainingCredits() + request.getCredits());
+
+        // Determine credit type (defaults to ADMIN_ISSUE)
+        CreditTransactionType type = request.getType() != null
+                ? request.getType()
+                : CreditTransactionType.ADMIN_ISSUE;
+
+        // Issue credits via CreditService (creates transaction record)
+        if (type == CreditTransactionType.PROMO) {
+            creditService.issuePromoCredits(profile, request.getCredits(), request.getReason());
+        } else {
+            creditService.issueAdminCredits(profile, request.getCredits(), request.getReason());
+        }
+
+        // Refresh profile to get updated balance
+        profile = creatorProfileRepository.findById(creatorId).orElseThrow();
 
         // Audit log the credit issuance
         Map<String, Object> oldValues = Map.of("remainingCredits", oldCredits);
         Map<String, Object> newValues = Map.of(
                 "remainingCredits", profile.getRemainingCredits(),
                 "creditsIssued", request.getCredits(),
+                "type", type.name(),
                 "reason", request.getReason() != null ? request.getReason() : "No reason provided"
         );
 
@@ -206,13 +223,14 @@ public class AdminService {
                 "CREDIT_ISSUE",
                 "CREATOR",
                 creatorId,
-                String.format("Issued %d credits to %s: %s",
-                        request.getCredits(), profile.getName(), request.getReason()),
+                String.format("Issued %d %s credits to %s: %s",
+                        request.getCredits(), type.name(), profile.getName(), request.getReason()),
                 oldValues,
                 newValues
         );
 
-        log.info("Admin issued {} credits to creator {}: {}", request.getCredits(), creatorId, request.getReason());
+        log.info("Admin issued {} {} credits to creator {}: {}",
+                request.getCredits(), type.name(), creatorId, request.getReason());
 
         return mapCreatorToDto(profile);
     }
