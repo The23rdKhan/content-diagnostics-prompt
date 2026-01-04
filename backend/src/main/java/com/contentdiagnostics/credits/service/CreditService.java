@@ -11,7 +11,9 @@ import com.contentdiagnostics.credits.dto.CreditTransactionDto;
 import com.contentdiagnostics.credits.entity.CreditBundle;
 import com.contentdiagnostics.credits.entity.CreditTransaction;
 import com.contentdiagnostics.credits.entity.CreditTransactionType;
+import com.contentdiagnostics.credits.repository.CreditBundleRepository;
 import com.contentdiagnostics.credits.repository.CreditTransactionRepository;
+import com.contentdiagnostics.plans.service.PlanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -35,6 +37,8 @@ public class CreditService {
 
     private final CreatorProfileRepository creatorProfileRepository;
     private final CreditTransactionRepository transactionRepository;
+    private final CreditBundleRepository creditBundleRepository;
+    private final PlanService planService;
 
     // Credits required per video (standard video < 30 min)
     public static final int CREDITS_PER_VIDEO = 5;
@@ -65,9 +69,10 @@ public class CreditService {
     /**
      * Get available credit bundles for purchase.
      */
+    @Transactional(readOnly = true)
     public List<CreditBundleDto> getAvailableBundles() {
-        return CreditBundle.getAvailableBundles().stream()
-                .map(this::toBundleDto)
+        return creditBundleRepository.findByActiveTrueOrderBySortOrderAsc().stream()
+                .map(CreditBundleDto::fromEntity)
                 .collect(Collectors.toList());
     }
 
@@ -88,10 +93,8 @@ public class CreditService {
     @Transactional
     public CreditTransaction addPurchasedCredits(CreatorProfile creator, String bundleId,
                                                   String paymentIntentId, BigDecimal pricePaid) {
-        CreditBundle bundle = CreditBundle.findById(bundleId);
-        if (bundle == null) {
-            throw new BadRequestException("Invalid bundle ID: " + bundleId);
-        }
+        CreditBundle bundle = creditBundleRepository.findByBundleCode(bundleId)
+                .orElseThrow(() -> new BadRequestException("Invalid bundle ID: " + bundleId));
 
         int newBalance = creator.getRemainingCredits() + bundle.getCredits();
         creatorProfileRepository.addCredits(creator.getId(), bundle.getCredits());
@@ -257,19 +260,6 @@ public class CreditService {
                 .orElseThrow(() -> new ResourceNotFoundException("Creator profile", user.getId().toString()));
     }
 
-    private CreditBundleDto toBundleDto(CreditBundle bundle) {
-        return CreditBundleDto.builder()
-                .id(bundle.getId())
-                .name(bundle.getName())
-                .credits(bundle.getCredits())
-                .price(bundle.getPrice())
-                .description(bundle.getDescription())
-                .popular(bundle.isPopular())
-                .pricePerCredit(bundle.getPricePerCredit())
-                .savingsPercent(bundle.getSavingsPercent())
-                .build();
-    }
-
     private CreditTransactionDto toTransactionDto(CreditTransaction tx) {
         return CreditTransactionDto.builder()
                 .id(tx.getId())
@@ -283,13 +273,9 @@ public class CreditService {
 
     public int getCreditsForPlanTier(String planTier) {
         if (planTier == null) {
-            return 15;
+            planTier = "basic";
         }
-        return switch (planTier.toLowerCase()) {
-            case "professional" -> 50;
-            case "enterprise" -> 250;
-            default -> 15;
-        };
+        return planService.getCreditsPerMonth(planTier);
     }
 
     /**

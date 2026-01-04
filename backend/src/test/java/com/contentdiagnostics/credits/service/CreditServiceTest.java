@@ -8,9 +8,12 @@ import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
 import com.contentdiagnostics.credits.dto.CreditBalanceDto;
 import com.contentdiagnostics.credits.dto.CreditBundleDto;
+import com.contentdiagnostics.credits.entity.CreditBundle;
 import com.contentdiagnostics.credits.entity.CreditTransaction;
 import com.contentdiagnostics.credits.entity.CreditTransactionType;
+import com.contentdiagnostics.credits.repository.CreditBundleRepository;
 import com.contentdiagnostics.credits.repository.CreditTransactionRepository;
+import com.contentdiagnostics.plans.service.PlanService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -42,14 +45,31 @@ class CreditServiceTest {
     @Mock
     private CreditTransactionRepository transactionRepository;
 
-    @InjectMocks
+    @Mock
+    private CreditBundleRepository creditBundleRepository;
+
+    @Mock
+    private PlanService planService;
+
     private CreditService creditService;
 
     private User testUser;
     private CreatorProfile creatorProfile;
+    private CreditBundle starterBundle;
+    private CreditBundle creatorBundle;
+    private CreditBundle proBundle;
+    private CreditBundle studioBundle;
 
     @BeforeEach
     void setUp() {
+        // Manually create service with mocked dependencies
+        creditService = new CreditService(
+                creatorProfileRepository,
+                transactionRepository,
+                creditBundleRepository,
+                planService
+        );
+
         testUser = new User();
         testUser.setId(1L);
         testUser.setEmail("creator@example.com");
@@ -59,6 +79,63 @@ class CreditServiceTest {
         creatorProfile.setId(1L);
         creatorProfile.setUser(testUser);
         creatorProfile.setRemainingCredits(50);
+
+        // Set up test bundles
+        starterBundle = CreditBundle.builder()
+                .id(1L)
+                .bundleCode("starter")
+                .name("Starter Pack")
+                .credits(10)
+                .price(new BigDecimal("15.00"))
+                .description("2 video reviews")
+                .popular(false)
+                .pricePerCredit(new BigDecimal("1.50"))
+                .savingsPercent(0)
+                .active(true)
+                .sortOrder(1)
+                .build();
+
+        creatorBundle = CreditBundle.builder()
+                .id(2L)
+                .bundleCode("creator")
+                .name("Creator Pack")
+                .credits(25)
+                .price(new BigDecimal("30.00"))
+                .description("5 video reviews")
+                .popular(true)
+                .pricePerCredit(new BigDecimal("1.20"))
+                .savingsPercent(20)
+                .active(true)
+                .sortOrder(2)
+                .build();
+
+        proBundle = CreditBundle.builder()
+                .id(3L)
+                .bundleCode("pro")
+                .name("Pro Pack")
+                .credits(50)
+                .price(new BigDecimal("50.00"))
+                .description("10 video reviews")
+                .popular(false)
+                .pricePerCredit(new BigDecimal("1.00"))
+                .savingsPercent(33)
+                .active(true)
+                .sortOrder(3)
+                .build();
+
+        studioBundle = CreditBundle.builder()
+                .id(4L)
+                .bundleCode("studio")
+                .name("Studio Pack")
+                .credits(100)
+                .price(new BigDecimal("85.00"))
+                .description("20 video reviews")
+                .popular(false)
+                .pricePerCredit(new BigDecimal("0.85"))
+                .savingsPercent(43)
+                .active(true)
+                .sortOrder(4)
+                .build();
     }
 
     @Nested
@@ -101,6 +178,9 @@ class CreditServiceTest {
         @Test
         @DisplayName("should return list of credit bundles")
         void shouldReturnBundles() {
+            when(creditBundleRepository.findByActiveTrueOrderBySortOrderAsc())
+                    .thenReturn(List.of(starterBundle, creatorBundle, proBundle, studioBundle));
+
             List<CreditBundleDto> bundles = creditService.getAvailableBundles();
 
             assertThat(bundles).hasSize(4);
@@ -111,6 +191,9 @@ class CreditServiceTest {
         @Test
         @DisplayName("should mark creator pack as popular")
         void shouldMarkCreatorPackAsPopular() {
+            when(creditBundleRepository.findByActiveTrueOrderBySortOrderAsc())
+                    .thenReturn(List.of(starterBundle, creatorBundle, proBundle, studioBundle));
+
             List<CreditBundleDto> bundles = creditService.getAvailableBundles();
 
             CreditBundleDto creatorPack = bundles.stream()
@@ -134,6 +217,8 @@ class CreditServiceTest {
             String paymentIntentId = "pi_test123";
             BigDecimal pricePaid = new BigDecimal("30.00");
 
+            when(creditBundleRepository.findByBundleCode(bundleId))
+                    .thenReturn(Optional.of(creatorBundle));
             when(transactionRepository.save(any(CreditTransaction.class)))
                     .thenAnswer(i -> i.getArgument(0));
 
@@ -151,6 +236,9 @@ class CreditServiceTest {
         @Test
         @DisplayName("should throw for invalid bundle ID")
         void shouldThrowForInvalidBundleId() {
+            when(creditBundleRepository.findByBundleCode("invalid_bundle"))
+                    .thenReturn(Optional.empty());
+
             assertThatThrownBy(() -> creditService.addPurchasedCredits(
                     creatorProfile, "invalid_bundle", "pi_test", BigDecimal.TEN))
                     .isInstanceOf(BadRequestException.class)
@@ -161,6 +249,8 @@ class CreditServiceTest {
         @DisplayName("should record Stripe payment intent ID")
         void shouldRecordPaymentIntentId() {
             String paymentIntentId = "pi_unique_123";
+            when(creditBundleRepository.findByBundleCode("starter"))
+                    .thenReturn(Optional.of(starterBundle));
             when(transactionRepository.save(any(CreditTransaction.class)))
                     .thenAnswer(i -> i.getArgument(0));
 
@@ -369,6 +459,7 @@ class CreditServiceTest {
         @Test
         @DisplayName("should add correct credits for basic plan (15)")
         void shouldAddCreditsForBasicPlan() {
+            when(planService.getCreditsPerMonth("basic")).thenReturn(15);
             when(transactionRepository.save(any(CreditTransaction.class)))
                     .thenAnswer(i -> i.getArgument(0));
 
@@ -382,6 +473,7 @@ class CreditServiceTest {
         @Test
         @DisplayName("should add correct credits for professional plan (50)")
         void shouldAddCreditsForProfessionalPlan() {
+            when(planService.getCreditsPerMonth("professional")).thenReturn(50);
             when(transactionRepository.save(any(CreditTransaction.class)))
                     .thenAnswer(i -> i.getArgument(0));
 
@@ -394,6 +486,7 @@ class CreditServiceTest {
         @Test
         @DisplayName("should add correct credits for enterprise plan (250)")
         void shouldAddCreditsForEnterprisePlan() {
+            when(planService.getCreditsPerMonth("enterprise")).thenReturn(250);
             when(transactionRepository.save(any(CreditTransaction.class)))
                     .thenAnswer(i -> i.getArgument(0));
 
@@ -406,6 +499,7 @@ class CreditServiceTest {
         @Test
         @DisplayName("should default to basic credits for null plan tier")
         void shouldDefaultToBasicForNullPlanTier() {
+            when(planService.getCreditsPerMonth("basic")).thenReturn(15);
             when(transactionRepository.save(any(CreditTransaction.class)))
                     .thenAnswer(i -> i.getArgument(0));
 
@@ -423,32 +517,37 @@ class CreditServiceTest {
         @Test
         @DisplayName("should return 15 for basic")
         void shouldReturn15ForBasic() {
+            when(planService.getCreditsPerMonth("basic")).thenReturn(15);
             assertThat(creditService.getCreditsForPlanTier("basic")).isEqualTo(15);
         }
 
         @Test
         @DisplayName("should return 50 for professional")
         void shouldReturn50ForProfessional() {
+            when(planService.getCreditsPerMonth("professional")).thenReturn(50);
             assertThat(creditService.getCreditsForPlanTier("professional")).isEqualTo(50);
         }
 
         @Test
         @DisplayName("should return 250 for enterprise")
         void shouldReturn250ForEnterprise() {
+            when(planService.getCreditsPerMonth("enterprise")).thenReturn(250);
             assertThat(creditService.getCreditsForPlanTier("enterprise")).isEqualTo(250);
         }
 
         @Test
         @DisplayName("should return 15 for null")
         void shouldReturn15ForNull() {
+            when(planService.getCreditsPerMonth("basic")).thenReturn(15);
             assertThat(creditService.getCreditsForPlanTier(null)).isEqualTo(15);
         }
 
         @Test
-        @DisplayName("should be case insensitive")
-        void shouldBeCaseInsensitive() {
-            assertThat(creditService.getCreditsForPlanTier("PROFESSIONAL")).isEqualTo(50);
-            assertThat(creditService.getCreditsForPlanTier("Professional")).isEqualTo(50);
+        @DisplayName("should delegate to planService")
+        void shouldDelegateToPlanService() {
+            when(planService.getCreditsPerMonth("professional")).thenReturn(50);
+            creditService.getCreditsForPlanTier("professional");
+            verify(planService).getCreditsPerMonth("professional");
         }
     }
 }

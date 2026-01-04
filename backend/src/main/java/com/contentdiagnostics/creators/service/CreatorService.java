@@ -9,15 +9,16 @@ import com.contentdiagnostics.creators.dto.UpdateCreatorProfileRequest;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
 import com.contentdiagnostics.credits.service.CreditService;
+import com.contentdiagnostics.plans.service.PlanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Service for creator profile operations.
@@ -29,6 +30,7 @@ public class CreatorService {
 
     private final CreatorProfileRepository creatorProfileRepository;
     private final CreditService creditService;
+    private final PlanService planService;
 
     /**
      * Get profile for the current user.
@@ -152,65 +154,20 @@ public class CreatorService {
      * Get available subscription plans.
      */
     public List<PlanDto> getAvailablePlans() {
-        return List.of(
-            PlanDto.builder()
-                .id("basic")
-                .name("Starter")
-                .description("Perfect for getting started with content feedback")
-                .price(new BigDecimal("49.00"))
-                .priceDisplay("$49")
-                .billingPeriod("month")
-                .reviewersPerVideo(5)
-                .videosPerMonth(3)
-                .features(List.of(
-                    "5 reviewers per video",
-                    "3 videos per month",
-                    "15 credits per month",
-                    "Basic analytics",
-                    "Email support"
-                ))
-                .popular(false)
-                .build(),
-            PlanDto.builder()
-                .id("professional")
-                .name("Professional")
-                .description("For creators serious about audience engagement")
-                .price(new BigDecimal("149.00"))
-                .priceDisplay("$149")
-                .billingPeriod("month")
-                .reviewersPerVideo(10)
-                .videosPerMonth(10)
-                .features(List.of(
-                    "10 reviewers per video",
-                    "10 videos per month",
-                    "50 credits per month",
-                    "Advanced analytics",
-                    "Priority support",
-                    "Audience demographics"
-                ))
-                .popular(true)
-                .build(),
-            PlanDto.builder()
-                .id("enterprise")
-                .name("Enterprise")
-                .description("For teams and high-volume creators")
-                .price(new BigDecimal("399.00"))
-                .priceDisplay("$399")
-                .billingPeriod("month")
-                .reviewersPerVideo(15)
-                .videosPerMonth(50)
-                .features(List.of(
-                    "15 reviewers per video",
-                    "50 videos per month",
-                    "250 credits per month",
-                    "Full analytics suite",
-                    "Dedicated support",
-                    "Custom integrations",
-                    "Team collaboration"
-                ))
-                .popular(false)
-                .build()
-        );
+        return planService.getActivePlans().stream()
+                .map(plan -> PlanDto.builder()
+                        .id(plan.getTierCode())
+                        .name(plan.getDisplayName())
+                        .description(plan.getDescription())
+                        .price(plan.getMonthlyPrice())
+                        .priceDisplay(plan.getPriceDisplay())
+                        .billingPeriod("month")
+                        .reviewersPerVideo(plan.getReviewersPerVideo())
+                        .videosPerMonth(plan.getVideosPerMonth())
+                        .features(plan.getFeatures())
+                        .popular(plan.getPopular())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     /**

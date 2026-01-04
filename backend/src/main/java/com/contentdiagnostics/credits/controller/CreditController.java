@@ -12,6 +12,7 @@ import com.contentdiagnostics.credits.dto.CreditBundleDto;
 import com.contentdiagnostics.credits.dto.CreditTransactionDto;
 import com.contentdiagnostics.credits.dto.PurchaseCreditsRequest;
 import com.contentdiagnostics.credits.entity.CreditBundle;
+import com.contentdiagnostics.credits.repository.CreditBundleRepository;
 import com.contentdiagnostics.credits.service.CreditService;
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
@@ -42,6 +43,7 @@ public class CreditController {
 
     private final CreditService creditService;
     private final CreatorProfileRepository creatorProfileRepository;
+    private final CreditBundleRepository creditBundleRepository;
 
     @Value("${stripe.secret-key:}")
     private String stripeSecretKey;
@@ -113,10 +115,8 @@ public class CreditController {
             @Valid @RequestBody PurchaseCreditsRequest request) {
         User user = SecurityUtils.getCurrentUser();
 
-        CreditBundle bundle = CreditBundle.findById(request.getBundleId());
-        if (bundle == null) {
-            throw new BadRequestException("Invalid bundle ID: " + request.getBundleId());
-        }
+        CreditBundle bundle = creditBundleRepository.findByBundleCode(request.getBundleId())
+                .orElseThrow(() -> new BadRequestException("Invalid bundle ID: " + request.getBundleId()));
 
         CreatorProfile profile = creatorProfileRepository.findByUser(user)
                 .orElseThrow(() -> new ResourceNotFoundException("Creator profile", user.getId().toString()));
@@ -134,7 +134,7 @@ public class CreditController {
             String successUrl = validateRedirectUrl(request.getSuccessUrl(), defaultSuccessUrl);
 
             // In dev mode, auto-add credits
-            creditService.addPurchasedCredits(profile, bundle.getId(), "mock_" + System.currentTimeMillis(), bundle.getPrice());
+            creditService.addPurchasedCredits(profile, bundle.getBundleCode(), "mock_" + System.currentTimeMillis(), bundle.getPrice());
 
             return ResponseEntity.ok(CheckoutSessionResponse.builder()
                     .sessionId("mock_credit_session_" + System.currentTimeMillis())
@@ -170,7 +170,7 @@ public class CreditController {
                                     .build())
                             .build())
                     .putMetadata("user_id", user.getId().toString())
-                    .putMetadata("bundle_id", bundle.getId())
+                    .putMetadata("bundle_id", bundle.getBundleCode())
                     .putMetadata("credits", String.valueOf(bundle.getCredits()))
                     .putMetadata("purchase_type", "credits")
                     .build();
@@ -178,7 +178,7 @@ public class CreditController {
             Session session = Session.create(params);
 
             log.info("Created credit purchase checkout session {} for user {}, bundle {}",
-                    session.getId(), user.getId(), bundle.getId());
+                    session.getId(), user.getId(), bundle.getBundleCode());
 
             return ResponseEntity.ok(CheckoutSessionResponse.builder()
                     .sessionId(session.getId())

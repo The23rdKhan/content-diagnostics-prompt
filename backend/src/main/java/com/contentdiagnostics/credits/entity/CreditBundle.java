@@ -1,85 +1,95 @@
 package com.contentdiagnostics.credits.entity;
 
-import lombok.Builder;
-import lombok.Data;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
-import java.util.List;
+import java.time.Instant;
 
 /**
- * Represents a purchasable credit bundle (pay-as-you-go).
- * These are static configurations, not database entities.
+ * Entity representing a purchasable credit bundle (pay-as-you-go).
  */
+@Entity
+@Table(name = "credit_bundles")
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CreditBundle {
 
-    private String id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /**
+     * Unique bundle code: "starter", "creator", "pro", "studio"
+     */
+    @Column(name = "bundle_code", nullable = false, unique = true, length = 50)
+    private String bundleCode;
+
+    /**
+     * Display name: "Starter Pack", "Creator Pack", etc.
+     */
+    @Column(nullable = false, length = 100)
     private String name;
-    private int credits;
+
+    /**
+     * Number of credits in this bundle
+     */
+    @Column(nullable = false)
+    private Integer credits;
+
+    /**
+     * Bundle price
+     */
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
+
+    /**
+     * Bundle description
+     */
+    @Column(columnDefinition = "TEXT")
     private String description;
-    private boolean popular;
+
+    /**
+     * Price per individual credit
+     */
+    @Column(name = "price_per_credit", precision = 10, scale = 2)
     private BigDecimal pricePerCredit;
-    private int savingsPercent;
 
     /**
-     * Get all available credit bundles.
-     * Credit pricing:
-     * - 5 credits = 1 video (<30 min, 2-3 reviewers, 3-day delivery)
+     * Savings percentage compared to base rate
      */
-    public static List<CreditBundle> getAvailableBundles() {
-        return List.of(
-                CreditBundle.builder()
-                        .id("starter")
-                        .name("Starter Pack")
-                        .credits(10)
-                        .price(new BigDecimal("15.00"))
-                        .description("2 video reviews")
-                        .popular(false)
-                        .pricePerCredit(new BigDecimal("1.50"))
-                        .savingsPercent(0)
-                        .build(),
-                CreditBundle.builder()
-                        .id("creator")
-                        .name("Creator Pack")
-                        .credits(25)
-                        .price(new BigDecimal("30.00"))
-                        .description("5 video reviews")
-                        .popular(true)
-                        .pricePerCredit(new BigDecimal("1.20"))
-                        .savingsPercent(20)
-                        .build(),
-                CreditBundle.builder()
-                        .id("pro")
-                        .name("Pro Pack")
-                        .credits(50)
-                        .price(new BigDecimal("50.00"))
-                        .description("10 video reviews")
-                        .popular(false)
-                        .pricePerCredit(new BigDecimal("1.00"))
-                        .savingsPercent(33)
-                        .build(),
-                CreditBundle.builder()
-                        .id("studio")
-                        .name("Studio Pack")
-                        .credits(100)
-                        .price(new BigDecimal("85.00"))
-                        .description("20 video reviews")
-                        .popular(false)
-                        .pricePerCredit(new BigDecimal("0.85"))
-                        .savingsPercent(43)
-                        .build()
-        );
-    }
+    @Column(name = "savings_percent")
+    private Integer savingsPercent;
 
     /**
-     * Find bundle by ID.
+     * Whether this bundle should be highlighted as popular
      */
-    public static CreditBundle findById(String bundleId) {
-        return getAvailableBundles().stream()
-                .filter(b -> b.getId().equals(bundleId))
-                .findFirst()
-                .orElse(null);
-    }
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean popular = false;
+
+    /**
+     * Whether this bundle is currently active and available
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean active = true;
+
+    /**
+     * Display order in bundle listings
+     */
+    @Column(name = "sort_order")
+    private Integer sortOrder;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 }

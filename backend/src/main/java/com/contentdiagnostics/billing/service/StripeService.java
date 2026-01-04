@@ -10,6 +10,8 @@ import com.contentdiagnostics.common.exception.BadRequestException;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
+import com.contentdiagnostics.credits.entity.CreditBundle;
+import com.contentdiagnostics.credits.repository.CreditBundleRepository;
 import com.contentdiagnostics.credits.service.CreditService;
 import com.contentdiagnostics.notifications.entity.NotificationType;
 import com.contentdiagnostics.notifications.service.NotificationService;
@@ -41,6 +43,7 @@ public class StripeService {
 
     private final StripeEventRepository stripeEventRepository;
     private final CreatorProfileRepository creatorProfileRepository;
+    private final CreditBundleRepository creditBundleRepository;
     private final CreditService creditService;
     private final NotificationService notificationService;
 
@@ -326,8 +329,8 @@ public class StripeService {
 
         creatorProfileRepository.findByStripeCustomerId(customerId).ifPresentOrElse(
             profile -> {
-                com.contentdiagnostics.credits.entity.CreditBundle bundle =
-                        com.contentdiagnostics.credits.entity.CreditBundle.findById(bundleId);
+                CreditBundle bundle = creditBundleRepository.findByBundleCode(bundleId)
+                        .orElse(null);
                 if (bundle != null) {
                     creditService.addPurchasedCredits(profile, bundleId, paymentIntentId, bundle.getPrice());
                     log.info("Added {} credits from bundle {} for profile {}",

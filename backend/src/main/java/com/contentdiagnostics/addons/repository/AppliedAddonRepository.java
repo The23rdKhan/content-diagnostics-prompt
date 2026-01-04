@@ -52,4 +52,11 @@ public interface AppliedAddonRepository extends JpaRepository<AppliedAddon, Long
      * Count applied addons by addon.
      */
     long countByAddon(com.contentdiagnostics.addons.entity.Addon addon);
+
+    /**
+     * Get usage counts for all addons in a single query (avoids N+1).
+     * Returns list of [addonId, count] arrays.
+     */
+    @Query("SELECT a.addon.id, COUNT(a) FROM AppliedAddon a GROUP BY a.addon.id")
+    List<Object[]> findAddonUsageCounts();
 }

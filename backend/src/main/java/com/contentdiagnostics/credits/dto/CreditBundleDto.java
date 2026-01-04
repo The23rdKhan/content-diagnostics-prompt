@@ -1,5 +1,6 @@
 package com.contentdiagnostics.credits.dto;
 
+import com.contentdiagnostics.credits.entity.CreditBundle;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,4 +25,17 @@ public class CreditBundleDto {
     private Boolean popular;
     private BigDecimal pricePerCredit;
     private Integer savingsPercent;
+
+    public static CreditBundleDto fromEntity(CreditBundle bundle) {
+        return CreditBundleDto.builder()
+                .id(bundle.getBundleCode())
+                .name(bundle.getName())
+                .credits(bundle.getCredits())
+                .price(bundle.getPrice())
+                .description(bundle.getDescription())
+                .popular(bundle.getPopular())
+                .pricePerCredit(bundle.getPricePerCredit())
+                .savingsPercent(bundle.getSavingsPercent())
+                .build();
+    }
 }

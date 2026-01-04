@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -87,8 +88,17 @@ public class AddonService {
      */
     @Transactional(readOnly = true)
     public List<AdminAddonDto> getAllAddons() {
-        return addonRepository.findAll().stream()
-                .map(addon -> AdminAddonDto.fromEntity(addon, appliedAddonRepository.countByAddon(addon)))
+        List<Addon> addons = addonRepository.findAll();
+
+        // Batch fetch all usage counts in one query (avoids N+1)
+        Map<Long, Long> usageCounts = appliedAddonRepository.findAddonUsageCounts().stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
+
+        return addons.stream()
+                .map(addon -> AdminAddonDto.fromEntity(addon, usageCounts.getOrDefault(addon.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 

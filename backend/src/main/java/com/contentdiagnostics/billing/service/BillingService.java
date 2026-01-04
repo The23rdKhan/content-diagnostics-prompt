@@ -10,6 +10,7 @@ import com.contentdiagnostics.billing.repository.InvoiceRepository;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
+import com.contentdiagnostics.plans.service.PlanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -20,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -30,13 +30,7 @@ public class BillingService {
     private final InvoiceRepository invoiceRepository;
     private final AppliedAddonRepository appliedAddonRepository;
     private final CreatorProfileRepository creatorProfileRepository;
-
-    // Plan pricing - in production, this would come from Stripe or a config table
-    private static final Map<String, BigDecimal> PLAN_PRICES = Map.of(
-            "basic", new BigDecimal("49.00"),
-            "professional", new BigDecimal("149.00"),
-            "enterprise", new BigDecimal("499.00")
-    );
+    private final PlanService planService;
 
     /**
      * Get billing summary for a user.
@@ -48,7 +42,15 @@ public class BillingService {
                 .orElseThrow(() -> new ResourceNotFoundException("CreatorProfile", user.getId().toString()));
 
         String planTier = profile.getPlanTier() != null ? profile.getPlanTier() : "basic";
-        BigDecimal currentPlanCost = PLAN_PRICES.getOrDefault(planTier, PLAN_PRICES.get("basic"));
+        BigDecimal currentPlanCost;
+        try {
+            currentPlanCost = planService.getPlanPrice(planTier);
+        } catch (ResourceNotFoundException e) {
+            // Fallback to basic plan if the plan tier is not found in database
+            log.warn("Plan tier '{}' not found, falling back to 'basic'", planTier);
+            planTier = "basic";
+            currentPlanCost = planService.getPlanPrice(planTier);
+        }
 
         // Calculate billing period (30 days from now going back)
         Instant billingPeriodEnd = Instant.now();
