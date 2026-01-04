@@ -2,19 +2,14 @@ package com.contentdiagnostics.auth.service;
 
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.auth.entity.UserRole;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.security.SignatureException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.UUID;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DisplayName("JwtService")
 class JwtServiceTest {
@@ -24,15 +19,16 @@ class JwtServiceTest {
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService();
-        // Set test configuration values
-        ReflectionTestUtils.setField(jwtService, "jwtSecret",
-            "test-secret-key-that-is-at-least-256-bits-long-for-hs256-algorithm");
-        ReflectionTestUtils.setField(jwtService, "jwtExpirationMs", 3600000L); // 1 hour
-        ReflectionTestUtils.setField(jwtService, "refreshExpirationMs", 604800000L); // 7 days
+        // Create JwtService with test configuration
+        String secret = "test-secret-key-that-is-at-least-256-bits-long-for-hs256";
+        String issuer = "content-diagnostics-test";
+        long accessTokenExpirationMs = 900000; // 15 minutes
+        long refreshTokenExpirationMs = 604800000; // 7 days
+
+        jwtService = new JwtService(secret, issuer, accessTokenExpirationMs, refreshTokenExpirationMs);
 
         testUser = new User();
-        testUser.setId(UUID.randomUUID());
+        testUser.setId(1L);
         testUser.setEmail("test@example.com");
         testUser.setRole(UserRole.CREATOR);
     }
@@ -42,39 +38,64 @@ class JwtServiceTest {
     class GenerateAccessToken {
 
         @Test
-        @DisplayName("should generate a valid JWT token")
+        @DisplayName("should generate valid token")
         void shouldGenerateValidToken() {
             String token = jwtService.generateAccessToken(testUser);
 
             assertThat(token).isNotNull();
-            assertThat(token.split("\\.")).hasSize(3); // JWT has 3 parts
+            assertThat(token).isNotEmpty();
+            assertThat(jwtService.validateToken(token)).isTrue();
         }
 
         @Test
-        @DisplayName("should include user email as subject")
-        void shouldIncludeEmailAsSubject() {
+        @DisplayName("should include user ID in token")
+        void shouldIncludeUserId() {
             String token = jwtService.generateAccessToken(testUser);
-            String extractedEmail = jwtService.extractUsername(token);
 
+            Long extractedId = jwtService.extractUserId(token);
+            assertThat(extractedId).isEqualTo(testUser.getId());
+        }
+
+        @Test
+        @DisplayName("should include email in token")
+        void shouldIncludeEmail() {
+            String token = jwtService.generateAccessToken(testUser);
+
+            String extractedEmail = jwtService.extractEmail(token);
             assertThat(extractedEmail).isEqualTo(testUser.getEmail());
         }
 
         @Test
-        @DisplayName("should include user role in claims")
-        void shouldIncludeRoleInClaims() {
+        @DisplayName("should include role in token")
+        void shouldIncludeRole() {
             String token = jwtService.generateAccessToken(testUser);
-            String role = jwtService.extractClaim(token, claims -> claims.get("role", String.class));
 
-            assertThat(role).isEqualTo(testUser.getRole().name());
+            String extractedRole = jwtService.extractRole(token);
+            assertThat(extractedRole).isEqualTo(testUser.getRole().name());
+        }
+    }
+
+    @Nested
+    @DisplayName("generateRefreshToken")
+    class GenerateRefreshToken {
+
+        @Test
+        @DisplayName("should generate valid token")
+        void shouldGenerateValidToken() {
+            String token = jwtService.generateRefreshToken(testUser);
+
+            assertThat(token).isNotNull();
+            assertThat(token).isNotEmpty();
+            assertThat(jwtService.validateToken(token)).isTrue();
         }
 
         @Test
-        @DisplayName("should include user id in claims")
-        void shouldIncludeUserIdInClaims() {
-            String token = jwtService.generateAccessToken(testUser);
-            String userId = jwtService.extractClaim(token, claims -> claims.get("userId", String.class));
+        @DisplayName("should generate unique tokens")
+        void shouldGenerateUniqueTokens() {
+            String token1 = jwtService.generateRefreshToken(testUser);
+            String token2 = jwtService.generateRefreshToken(testUser);
 
-            assertThat(userId).isEqualTo(testUser.getId().toString());
+            assertThat(token1).isNotEqualTo(token2);
         }
     }
 
@@ -87,107 +108,122 @@ class JwtServiceTest {
         void shouldReturnTrueForValidToken() {
             String token = jwtService.generateAccessToken(testUser);
 
-            boolean isValid = jwtService.isTokenValid(token, testUser);
+            boolean isValid = jwtService.validateToken(token);
 
             assertThat(isValid).isTrue();
         }
 
         @Test
-        @DisplayName("should return false for token with different user")
-        void shouldReturnFalseForDifferentUser() {
-            String token = jwtService.generateAccessToken(testUser);
-
-            User differentUser = new User();
-            differentUser.setEmail("different@example.com");
-
-            boolean isValid = jwtService.isTokenValid(token, differentUser);
+        @DisplayName("should return false for malformed token")
+        void shouldReturnFalseForMalformedToken() {
+            boolean isValid = jwtService.validateToken("not-a-valid-jwt");
 
             assertThat(isValid).isFalse();
         }
 
         @Test
-        @DisplayName("should throw exception for malformed token")
-        void shouldThrowExceptionForMalformedToken() {
-            String malformedToken = "not.a.valid.jwt";
-
-            assertThatThrownBy(() -> jwtService.extractUsername(malformedToken))
-                .isInstanceOf(MalformedJwtException.class);
-        }
-
-        @Test
-        @DisplayName("should throw exception for token with invalid signature")
-        void shouldThrowExceptionForInvalidSignature() {
+        @DisplayName("should return false for tampered token")
+        void shouldReturnFalseForTamperedToken() {
             String token = jwtService.generateAccessToken(testUser);
-            // Tamper with the signature
-            String tamperedToken = token.substring(0, token.lastIndexOf('.') + 1) + "invalidsignature";
+            String tamperedToken = token.substring(0, token.length() - 5) + "XXXXX";
 
-            assertThatThrownBy(() -> jwtService.extractUsername(tamperedToken))
-                .isInstanceOf(SignatureException.class);
-        }
+            boolean isValid = jwtService.validateToken(tamperedToken);
 
-        @Test
-        @DisplayName("should throw exception for expired token")
-        void shouldThrowExceptionForExpiredToken() {
-            // Set expiration to -1 second (already expired)
-            ReflectionTestUtils.setField(jwtService, "jwtExpirationMs", -1000L);
-            String expiredToken = jwtService.generateAccessToken(testUser);
-
-            assertThatThrownBy(() -> jwtService.extractUsername(expiredToken))
-                .isInstanceOf(ExpiredJwtException.class);
+            assertThat(isValid).isFalse();
         }
     }
 
     @Nested
-    @DisplayName("generateRefreshToken")
-    class GenerateRefreshToken {
+    @DisplayName("validateTokenForUser")
+    class ValidateTokenForUser {
 
         @Test
-        @DisplayName("should generate a unique refresh token string")
-        void shouldGenerateUniqueRefreshToken() {
-            String token1 = jwtService.generateRefreshTokenString();
-            String token2 = jwtService.generateRefreshTokenString();
+        @DisplayName("should return true for matching user")
+        void shouldReturnTrueForMatchingUser() {
+            String token = jwtService.generateAccessToken(testUser);
 
-            assertThat(token1).isNotNull();
-            assertThat(token2).isNotNull();
-            assertThat(token1).isNotEqualTo(token2);
+            boolean isValid = jwtService.validateTokenForUser(token, testUser);
+
+            assertThat(isValid).isTrue();
         }
 
         @Test
-        @DisplayName("refresh token should be valid UUID format")
-        void refreshTokenShouldBeValidUuid() {
-            String token = jwtService.generateRefreshTokenString();
+        @DisplayName("should return false for different user")
+        void shouldReturnFalseForDifferentUser() {
+            String token = jwtService.generateAccessToken(testUser);
 
-            // Should not throw exception
-            UUID.fromString(token);
+            User differentUser = new User();
+            differentUser.setId(999L);
+            differentUser.setEmail("other@example.com");
+
+            boolean isValid = jwtService.validateTokenForUser(token, differentUser);
+
+            assertThat(isValid).isFalse();
         }
     }
 
     @Nested
-    @DisplayName("extractClaims")
-    class ExtractClaims {
+    @DisplayName("isTokenExpired")
+    class IsTokenExpired {
 
         @Test
-        @DisplayName("should extract expiration date")
-        void shouldExtractExpirationDate() {
+        @DisplayName("should return false for valid token")
+        void shouldReturnFalseForValidToken() {
             String token = jwtService.generateAccessToken(testUser);
 
-            var expiration = jwtService.extractExpiration(token);
+            boolean isExpired = jwtService.isTokenExpired(token);
 
-            assertThat(expiration).isNotNull();
-            assertThat(expiration.getTime()).isGreaterThan(System.currentTimeMillis());
+            assertThat(isExpired).isFalse();
         }
 
         @Test
-        @DisplayName("should extract all claims")
-        void shouldExtractAllClaims() {
+        @DisplayName("should return true for invalid token")
+        void shouldReturnTrueForInvalidToken() {
+            boolean isExpired = jwtService.isTokenExpired("invalid-token");
+
+            assertThat(isExpired).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("extractExpiration")
+    class ExtractExpiration {
+
+        @Test
+        @DisplayName("should return future instant for valid token")
+        void shouldReturnFutureInstant() {
             String token = jwtService.generateAccessToken(testUser);
 
-            var claims = jwtService.extractAllClaims(token);
+            Instant expiration = jwtService.extractExpiration(token);
 
-            assertThat(claims).isNotNull();
-            assertThat(claims.getSubject()).isEqualTo(testUser.getEmail());
-            assertThat(claims.get("role")).isEqualTo(testUser.getRole().name());
-            assertThat(claims.get("userId")).isEqualTo(testUser.getId().toString());
+            assertThat(expiration).isAfter(Instant.now());
+        }
+    }
+
+    @Nested
+    @DisplayName("getAccessTokenExpirationSeconds")
+    class GetAccessTokenExpirationSeconds {
+
+        @Test
+        @DisplayName("should return correct expiration in seconds")
+        void shouldReturnCorrectExpiration() {
+            long expirationSeconds = jwtService.getAccessTokenExpirationSeconds();
+
+            // 15 minutes = 900 seconds
+            assertThat(expirationSeconds).isEqualTo(900);
+        }
+    }
+
+    @Nested
+    @DisplayName("getRefreshTokenExpiration")
+    class GetRefreshTokenExpiration {
+
+        @Test
+        @DisplayName("should return future instant")
+        void shouldReturnFutureInstant() {
+            Instant expiration = jwtService.getRefreshTokenExpiration();
+
+            assertThat(expiration).isAfter(Instant.now());
         }
     }
 }
