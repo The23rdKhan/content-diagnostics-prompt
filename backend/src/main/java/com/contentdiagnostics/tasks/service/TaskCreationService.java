@@ -8,8 +8,8 @@ import com.contentdiagnostics.tasks.repository.TaskRepository;
 import com.contentdiagnostics.videos.entity.Video;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,21 +23,29 @@ import java.util.List;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class TaskCreationService {
 
     private final TaskRepository taskRepository;
     private final ObjectMapper objectMapper;
 
     /**
-     * Default pay amount per task.
+     * Default pay amount per task (from config).
      */
-    private static final double DEFAULT_PAY_AMOUNT = 0.30;
+    private final double defaultPayAmount;
 
     /**
      * Index of attention check question (0-based).
      */
     private static final int ATTENTION_CHECK_INDEX = 3;
+
+    public TaskCreationService(
+            TaskRepository taskRepository,
+            ObjectMapper objectMapper,
+            @Value("${app.task.default-pay-amount:0.30}") double defaultPayAmount) {
+        this.taskRepository = taskRepository;
+        this.objectMapper = objectMapper;
+        this.defaultPayAmount = defaultPayAmount;
+    }
 
     /**
      * Creates tasks for a job based on the required number of reviewers.
@@ -64,7 +72,7 @@ public class TaskCreationService {
                     .segmentTimestamp(segmentTimestamp)
                     .segmentStartSeconds(0)
                     .segmentEndSeconds(videoDurationSeconds)
-                    .payAmount(DEFAULT_PAY_AMOUNT)
+                    .payAmount(defaultPayAmount)
                     .videoSegmentUrl(video.getStorageUrl())
                     .questionsJson(questionsJson)
                     .attentionCheckIndex(ATTENTION_CHECK_INDEX)

@@ -95,6 +95,9 @@ app:
     lease-duration-minutes: 10
     min-watch-ratio: 0.70
     min-completion-time-seconds: 30
+    default-pay-amount: 0.30
+  payout:
+    minimum-amount: 10.0
   reviewer:
     initial-quality-score: 100
     lock-threshold: 60

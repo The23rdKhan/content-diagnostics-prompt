@@ -10,8 +10,8 @@ import com.contentdiagnostics.payouts.entity.PayoutStatus;
 import com.contentdiagnostics.payouts.repository.PayoutRepository;
 import com.contentdiagnostics.reviewers.entity.ReviewerProfile;
 import com.contentdiagnostics.reviewers.repository.ReviewerProfileRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,13 +26,20 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PayoutService {
-
-    private static final double MINIMUM_PAYOUT_AMOUNT = 10.0;
 
     private final PayoutRepository payoutRepository;
     private final ReviewerProfileRepository reviewerProfileRepository;
+    private final double minimumPayoutAmount;
+
+    public PayoutService(
+            PayoutRepository payoutRepository,
+            ReviewerProfileRepository reviewerProfileRepository,
+            @Value("${app.payout.minimum-amount:10.0}") double minimumPayoutAmount) {
+        this.payoutRepository = payoutRepository;
+        this.reviewerProfileRepository = reviewerProfileRepository;
+        this.minimumPayoutAmount = minimumPayoutAmount;
+    }
 
     /**
      * Get all payouts for a reviewer.
@@ -61,10 +68,10 @@ public class PayoutService {
 
         // Validate minimum payout amount
         double amount = request.getAmount() != null ? request.getAmount() : profile.getPendingEarnings();
-        if (amount < MINIMUM_PAYOUT_AMOUNT) {
+        if (amount < minimumPayoutAmount) {
             throw new ValidationException(
                     String.format("Minimum payout amount is $%.2f. Current pending: $%.2f",
-                            MINIMUM_PAYOUT_AMOUNT, profile.getPendingEarnings()));
+                            minimumPayoutAmount, profile.getPendingEarnings()));
         }
 
         if (amount > profile.getPendingEarnings()) {

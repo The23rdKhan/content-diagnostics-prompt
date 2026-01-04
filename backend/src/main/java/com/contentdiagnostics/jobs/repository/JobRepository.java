@@ -102,4 +102,10 @@ public interface JobRepository extends JpaRepository<Job, Long> {
      */
     @Query("SELECT COUNT(j) FROM Job j WHERE j.language = :language AND j.status IN ('IN_REVIEW', 'SEGMENTED')")
     long countActiveByLanguage(@Param("language") String language);
+
+    /**
+     * Count jobs by statuses.
+     */
+    @Query("SELECT COUNT(j) FROM Job j WHERE j.status IN :statuses")
+    long countByStatusIn(@Param("statuses") List<JobStatus> statuses);
 }

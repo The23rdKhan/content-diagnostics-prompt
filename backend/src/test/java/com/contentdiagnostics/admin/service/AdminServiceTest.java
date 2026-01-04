@@ -148,9 +148,8 @@ class AdminServiceTest {
             when(userRepository.countByRole(UserRole.CREATOR)).thenReturn(100L);
             when(userRepository.countByRole(UserRole.REVIEWER)).thenReturn(50L);
             when(reviewerProfileRepository.countActiveByLanguage("English")).thenReturn(30L);
-            when(taskRepository.findByStatusOrderByCreatedAtAsc(TaskStatus.AVAILABLE))
-                    .thenReturn(Collections.emptyList());
-            when(jobRepository.findByStatusIn(anyList())).thenReturn(Collections.emptyList());
+            when(taskRepository.countByStatus(TaskStatus.AVAILABLE)).thenReturn(0L);
+            when(jobRepository.countByStatusIn(anyList())).thenReturn(0L);
 
             KpiResponse kpis = adminService.getKpis();
 
@@ -164,12 +163,8 @@ class AdminServiceTest {
         void shouldCountPendingTasks() {
             when(userRepository.countByRole(any())).thenReturn(0L);
             when(reviewerProfileRepository.countActiveByLanguage("English")).thenReturn(0L);
-
-            Task task1 = new Task();
-            Task task2 = new Task();
-            when(taskRepository.findByStatusOrderByCreatedAtAsc(TaskStatus.AVAILABLE))
-                    .thenReturn(List.of(task1, task2));
-            when(jobRepository.findByStatusIn(anyList())).thenReturn(Collections.emptyList());
+            when(taskRepository.countByStatus(TaskStatus.AVAILABLE)).thenReturn(2L);
+            when(jobRepository.countByStatusIn(anyList())).thenReturn(0L);
 
             KpiResponse kpis = adminService.getKpis();
 

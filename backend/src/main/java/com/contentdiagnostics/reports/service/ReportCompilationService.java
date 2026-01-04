@@ -75,10 +75,8 @@ public class ReportCompilationService {
     public Report compileReport(Job job) {
         log.info("Compiling report for job {}", job.getId());
 
-        // Get all approved tasks for this job
-        List<Task> approvedTasks = taskRepository.findByJob(job).stream()
-                .filter(t -> t.getStatus() == TaskStatus.APPROVED)
-                .collect(Collectors.toList());
+        // Get all approved tasks for this job (using efficient DB-level filtering)
+        List<Task> approvedTasks = taskRepository.findByJobAndStatus(job, TaskStatus.APPROVED);
 
         if (approvedTasks.isEmpty()) {
             log.warn("No approved tasks found for job {}", job.getId());

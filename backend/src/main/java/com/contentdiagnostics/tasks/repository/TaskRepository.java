@@ -182,4 +182,14 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             "ORDER BY FUNCTION('DATE', t.reviewedAt) DESC")
     List<Object[]> getDailyEarningsBreakdown(@Param("reviewer") ReviewerProfile reviewer,
                                              @Param("since") Instant since);
+
+    /**
+     * Count tasks by status.
+     */
+    long countByStatus(TaskStatus status);
+
+    /**
+     * Find tasks by job and status.
+     */
+    List<Task> findByJobAndStatus(Job job, TaskStatus status);
 }

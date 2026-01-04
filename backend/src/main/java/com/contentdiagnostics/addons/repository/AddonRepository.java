@@ -11,4 +11,5 @@ import java.util.Optional;
 public interface AddonRepository extends JpaRepository<Addon, Long> {
     List<Addon> findByActiveTrue();
     Optional<Addon> findByCode(String code);
+    long countByActiveTrue();
 }

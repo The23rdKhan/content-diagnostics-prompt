@@ -192,7 +192,7 @@ public class AddonService {
         long totalCompleted = appliedAddonRepository.countByStatus(AppliedAddon.AppliedAddonStatus.COMPLETED);
         long totalRefunded = appliedAddonRepository.countByStatus(AppliedAddon.AppliedAddonStatus.REFUNDED);
         long catalogCount = addonRepository.count();
-        long activeCatalogCount = addonRepository.findByActiveTrue().size();
+        long activeCatalogCount = addonRepository.countByActiveTrue();
 
         return AddonStatsDto.builder()
                 .catalogCount(catalogCount)

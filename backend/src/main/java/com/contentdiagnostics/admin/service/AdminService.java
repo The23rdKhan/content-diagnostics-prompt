@@ -61,11 +61,11 @@ public class AdminService {
         long totalReviewers = userRepository.countByRole(UserRole.REVIEWER);
         long activeReviewers = reviewerProfileRepository.countActiveByLanguage("English");
 
-        List<TaskStatus> pendingStatuses = List.of(TaskStatus.AVAILABLE, TaskStatus.LEASED);
-        long pendingTasks = taskRepository.findByStatusOrderByCreatedAtAsc(TaskStatus.AVAILABLE).size();
+        // Use efficient count queries instead of fetching all entities
+        long pendingTasks = taskRepository.countByStatus(TaskStatus.AVAILABLE);
 
         List<JobStatus> inProgressStatuses = List.of(JobStatus.PROCESSING, JobStatus.IN_REVIEW, JobStatus.COMPILING);
-        long jobsInProgress = jobRepository.findByStatusIn(inProgressStatuses).size();
+        long jobsInProgress = jobRepository.countByStatusIn(inProgressStatuses);
 
         return KpiResponse.builder()
                 .totalCreators(totalCreators)
