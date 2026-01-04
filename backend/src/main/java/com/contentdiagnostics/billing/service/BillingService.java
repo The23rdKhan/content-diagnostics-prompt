@@ -1,6 +1,5 @@
 package com.contentdiagnostics.billing.service;
 
-import com.contentdiagnostics.addons.entity.AppliedAddon;
 import com.contentdiagnostics.addons.repository.AppliedAddonRepository;
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.billing.dto.BillingSummaryDto;
@@ -9,6 +8,8 @@ import com.contentdiagnostics.billing.dto.PaymentMethodDto;
 import com.contentdiagnostics.billing.entity.Invoice;
 import com.contentdiagnostics.billing.repository.InvoiceRepository;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
+import com.contentdiagnostics.creators.entity.CreatorProfile;
+import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -27,20 +29,34 @@ public class BillingService {
 
     private final InvoiceRepository invoiceRepository;
     private final AppliedAddonRepository appliedAddonRepository;
+    private final CreatorProfileRepository creatorProfileRepository;
+
+    // Plan pricing - in production, this would come from Stripe or a config table
+    private static final Map<String, BigDecimal> PLAN_PRICES = Map.of(
+            "basic", new BigDecimal("49.00"),
+            "professional", new BigDecimal("149.00"),
+            "enterprise", new BigDecimal("499.00")
+    );
 
     /**
      * Get billing summary for a user.
      */
     @Transactional(readOnly = true)
     public BillingSummaryDto getBillingSummary(User user) {
-        // Calculate add-ons this month
-        BigDecimal addonsThisMonth = appliedAddonRepository.findByCreatorOrderByAppliedAtDesc(user).stream()
-                .filter(addon -> addon.getAppliedAt().isAfter(Instant.now().minus(30, ChronoUnit.DAYS)))
-                .map(AppliedAddon::getPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Get creator's current plan
+        CreatorProfile profile = creatorProfileRepository.findByUser(user)
+                .orElseThrow(() -> new ResourceNotFoundException("CreatorProfile", user.getId().toString()));
 
-        // Get current plan cost from subscription (simplified for now)
-        BigDecimal currentPlanCost = new BigDecimal("149.00"); // Default to Pro plan
+        String planTier = profile.getPlanTier() != null ? profile.getPlanTier() : "basic";
+        BigDecimal currentPlanCost = PLAN_PRICES.getOrDefault(planTier, PLAN_PRICES.get("basic"));
+
+        // Calculate billing period (30 days from now going back)
+        Instant billingPeriodEnd = Instant.now();
+        Instant billingPeriodStart = billingPeriodEnd.minus(30, ChronoUnit.DAYS);
+
+        // Calculate add-ons this billing period using efficient DB query (includes quantity)
+        BigDecimal addonsThisMonth = appliedAddonRepository.calculateTotalSpend(
+                user, billingPeriodStart, billingPeriodEnd);
 
         // Calculate next invoice
         BigDecimal nextInvoiceAmount = currentPlanCost.add(addonsThisMonth);
@@ -52,6 +68,7 @@ public class BillingService {
                 .nextInvoiceAmount(nextInvoiceAmount)
                 .nextInvoiceDate(nextInvoiceDate)
                 .currency("USD")
+                .planTier(planTier)
                 .build();
     }
 

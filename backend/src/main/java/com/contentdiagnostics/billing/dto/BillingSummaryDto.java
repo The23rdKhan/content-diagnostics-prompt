@@ -13,6 +13,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 public class BillingSummaryDto {
+    private String planTier;
     private BigDecimal currentPlanCost;
     private BigDecimal addonsThisMonth;
     private BigDecimal nextInvoiceAmount;
