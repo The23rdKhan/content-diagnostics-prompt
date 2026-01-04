@@ -130,7 +130,9 @@ export function AddonsSection() {
     <div className="space-y-6">
       <div className="rounded-xl border border-border bg-card p-6">
         <h2 className="text-lg font-semibold text-card-foreground">Available Add-ons</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Enhance your reviews with additional features</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Add-ons are billed in USD at submission and do not use credits.
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -152,7 +154,7 @@ export function AddonsSection() {
               </div>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-sm font-medium text-accent">{addon.priceDisplay}</span>
-                <span className="text-xs text-muted-foreground">Select during upload</span>
+                <span className="text-xs text-muted-foreground">Billed in USD at upload</span>
               </div>
             </div>
           )

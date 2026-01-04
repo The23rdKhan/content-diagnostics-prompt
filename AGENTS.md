@@ -5,6 +5,9 @@
 - `app/` holds Next.js App Router pages and layouts for the frontend.
 - `components/`, `hooks/`, and `lib/` contain shared UI, React hooks, and client utilities.
 - `styles/` and `public/` store global styles and static assets.
+- `tests/` contains Vitest frontend tests and setup.
+- `scripts/` houses project scripts (e.g., mock checks).
+- `proxy.ts` provides local proxy utilities.
 - `backend/` contains the Spring Boot service (Java 21), including `src/main/java`, `src/test/java`, and `src/main/resources/db/migration` for Flyway SQL.
 - `doc/` includes backend runbooks and operational notes.
 
@@ -15,6 +18,9 @@ Frontend (run from repo root):
 - `pnpm build` - create the production build.
 - `pnpm start` - run the production build locally.
 - `pnpm lint` - run ESLint across the project.
+- `pnpm test` - run Vitest in CI mode.
+- `pnpm test:watch` - run Vitest in watch mode.
+- `pnpm check:mocks` - run mock checks.
 
 Backend (run from `backend/`):
 - `./gradlew bootRun` - start the Spring Boot API locally.
@@ -32,7 +38,7 @@ Backend (run from `backend/`):
 
 - Backend tests live in `backend/src/test/java` and use Gradle (`./gradlew test`).
 - Name tests after the class under test (e.g., `TaskServiceTest`).
-- No frontend test runner is configured yet; if you add one, document the command here.
+- Frontend tests use Vitest and live in `tests/` (see `pnpm test`).
 
 ## Commit & Pull Request Guidelines
 

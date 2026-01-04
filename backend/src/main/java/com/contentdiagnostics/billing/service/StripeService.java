@@ -393,6 +393,11 @@ public class StripeService {
         // Create notification for user
         String customerId = invoice.getCustomer();
         creatorProfileRepository.findByStripeCustomerId(customerId).ifPresent(profile -> {
+            String planTier = profile.getPlanTier() != null ? profile.getPlanTier() : "basic";
+            String referenceId = invoice.getId();
+            if (!creditService.isExternalTransactionProcessed(referenceId)) {
+                creditService.addSubscriptionCredits(profile, planTier, referenceId);
+            }
             notificationService.createNotification(
                     profile.getUser(),
                     NotificationType.SUBSCRIPTION_BILLING,

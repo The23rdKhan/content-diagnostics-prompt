@@ -18,6 +18,7 @@ Production-ready Spring Boot 3.x backend for Content Diagnostics - a platform wh
 - Docker and Docker Compose
 - Java 21 (for local development without Docker)
 - Gradle 8.x (or use included wrapper)
+- Ensure ports `8080`, `5432`, and `4566` are available for the API, Postgres, and LocalStack.
 
 ### Running with Docker Compose
 

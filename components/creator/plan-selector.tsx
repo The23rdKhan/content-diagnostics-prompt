@@ -10,35 +10,51 @@ export interface PlanOption {
   price: number
   reviewersPerVideo: number
   deliveryDays: number
+  videosPerMonth: number
+  monthlyCredits: number
   features: string[]
 }
 
 export const CREATOR_PLANS: PlanOption[] = [
   {
-    id: "starter",
+    id: "basic",
     name: "Starter",
     price: 49,
     reviewersPerVideo: 5,
     deliveryDays: 2,
-    features: ["5 reviewers per video", "48-hour delivery", "AI diagnostics", "Basic reports"],
+    videosPerMonth: 3,
+    monthlyCredits: 15,
+    features: ["5 reviewers per video", "48-hour delivery", "15 credits per month", "AI diagnostics", "Basic reports"],
   },
   {
-    id: "pro",
+    id: "professional",
     name: "Pro",
     price: 149,
     reviewersPerVideo: 10,
     deliveryDays: 1,
-    features: ["10 reviewers per video", "24-hour delivery", "AI diagnostics", "Detailed reports", "Priority support"],
+    videosPerMonth: 10,
+    monthlyCredits: 50,
+    features: [
+      "10 reviewers per video",
+      "24-hour delivery",
+      "50 credits per month",
+      "AI diagnostics",
+      "Detailed reports",
+      "Priority support",
+    ],
   },
   {
-    id: "studio",
+    id: "enterprise",
     name: "Studio",
     price: 399,
     reviewersPerVideo: 15,
     deliveryDays: 0.5,
+    videosPerMonth: 50,
+    monthlyCredits: 250,
     features: [
       "15 reviewers per video",
       "12-hour delivery",
+      "250 credits per month",
       "AI diagnostics",
       "Comprehensive reports",
       "Dedicated support",
@@ -66,12 +82,12 @@ export function PlanSelector({ selectedPlanId, onSelectPlan }: PlanSelectorProps
           <CardHeader>
             <CardTitle>{plan.name}</CardTitle>
             <div className="text-3xl font-bold text-accent mt-2">${plan.price}</div>
-            <CardDescription>per video submission</CardDescription>
+            <CardDescription>billed monthly</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <div className="text-sm font-medium text-muted-foreground">
-                {plan.reviewersPerVideo} reviewers • {plan.deliveryDays}-day delivery
+                {plan.reviewersPerVideo} reviewers • {plan.deliveryDays}-day delivery • {plan.videosPerMonth} videos/mo
               </div>
             </div>
             <ul className="space-y-2">

@@ -8,6 +8,7 @@ import com.contentdiagnostics.creators.dto.SubscriptionDto;
 import com.contentdiagnostics.creators.dto.UpdateCreatorProfileRequest;
 import com.contentdiagnostics.creators.entity.CreatorProfile;
 import com.contentdiagnostics.creators.repository.CreatorProfileRepository;
+import com.contentdiagnostics.credits.service.CreditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import java.util.List;
 public class CreatorService {
 
     private final CreatorProfileRepository creatorProfileRepository;
+    private final CreditService creditService;
 
     /**
      * Get profile for the current user.
@@ -163,6 +165,7 @@ public class CreatorService {
                 .features(List.of(
                     "5 reviewers per video",
                     "3 videos per month",
+                    "15 credits per month",
                     "Basic analytics",
                     "Email support"
                 ))
@@ -180,6 +183,7 @@ public class CreatorService {
                 .features(List.of(
                     "10 reviewers per video",
                     "10 videos per month",
+                    "50 credits per month",
                     "Advanced analytics",
                     "Priority support",
                     "Audience demographics"
@@ -194,10 +198,11 @@ public class CreatorService {
                 .priceDisplay("$399")
                 .billingPeriod("month")
                 .reviewersPerVideo(15)
-                .videosPerMonth(-1) // Unlimited
+                .videosPerMonth(50)
                 .features(List.of(
                     "15 reviewers per video",
-                    "Unlimited videos",
+                    "50 videos per month",
+                    "250 credits per month",
                     "Full analytics suite",
                     "Dedicated support",
                     "Custom integrations",
@@ -256,16 +261,8 @@ public class CreatorService {
         profile.setPlanTier(planTier);
         profile.setStripeCustomerId("mock_cus_" + user.getId());
         profile.setStripeSubscriptionId("mock_sub_" + System.currentTimeMillis());
-
-        // Set initial credits based on plan
-        int credits = switch (planTier.toLowerCase()) {
-            case "professional" -> 10;
-            case "enterprise" -> 50;
-            default -> 3; // basic
-        };
-        profile.setRemainingCredits(credits);
-
         creatorProfileRepository.save(profile);
+        creditService.addSubscriptionCredits(profile, planTier, "mock_subscription_" + System.currentTimeMillis());
         log.info("Activated mock subscription for user {}: plan={}", user.getId(), planTier);
 
         return getSubscription(user);

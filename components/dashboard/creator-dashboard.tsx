@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Upload, FileVideo, BarChart3, CreditCard, Plus, HelpCircle, LogOut, Menu, X, Clock, Coins } from "lucide-react"
 import { UploadSection } from "./creator/upload-section"
@@ -37,6 +37,14 @@ export function CreatorDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const section = searchParams.get("section")
+    if (section && navItems.some((item) => item.id === section)) {
+      setActiveSection(section as ActiveSection)
+    }
+  }, [searchParams])
 
   // Redirect to sign-in if not authenticated
   useEffect(() => {

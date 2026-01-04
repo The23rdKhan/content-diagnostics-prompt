@@ -40,8 +40,8 @@ export default function CreatorPlanOnboarding() {
 
           <h1 className="text-4xl font-bold text-foreground mb-2">Select Your Plan</h1>
           <p className="text-lg text-muted-foreground max-w-2xl">
-            Choose the plan that fits your feedback needs. Each plan includes AI diagnostics, structured reports, and
-            guaranteed human reviewers.
+            Choose the plan that fits your feedback needs. Each plan includes monthly credits, AI diagnostics,
+            structured reports, and guaranteed human reviewers.
           </p>
         </div>
 

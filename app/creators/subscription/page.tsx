@@ -97,11 +97,14 @@ export default function CreatorSubscription() {
                 </div>
                 <div className="text-right">
                   <div className="text-3xl font-bold text-accent">${activePlan?.price}</div>
-                  <p className="text-sm text-muted-foreground">per video</p>
+                  <p className="text-sm text-muted-foreground">per month</p>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="text-sm text-muted-foreground">
+                Includes {activePlan?.monthlyCredits} credits per month
+              </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <h4 className="font-semibold mb-2">Reviewers Per Video</h4>
@@ -177,12 +180,13 @@ export default function CreatorSubscription() {
                 <CardHeader>
                   <CardTitle>{plan.name} Plan</CardTitle>
                   <div className="text-3xl font-bold text-accent mt-2">${plan.price}</div>
-                  <CardDescription>per video submission</CardDescription>
+                  <CardDescription>billed monthly</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 space-y-4">
                   <div className="text-sm">
                     <div className="font-medium mb-1">{plan.reviewersPerVideo} reviewers</div>
                     <div className="text-muted-foreground">{plan.deliveryDays}-day delivery</div>
+                    <div className="text-muted-foreground">{plan.monthlyCredits} credits per month</div>
                   </div>
 
                   <ul className="space-y-2">

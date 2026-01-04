@@ -2,11 +2,12 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { trackEvent } from "@/lib/analytics"
-import { Upload, FileText, ArrowRight } from "lucide-react"
+import { Upload, FileText, ArrowRight, Sparkles, Coins, Package } from "lucide-react"
 
 export default function CreatorWelcome() {
   const [confirmedOnboarding, setConfirmedOnboarding] = useState(false)
@@ -18,7 +19,7 @@ export default function CreatorWelcome() {
   }
 
   const handleViewSampleReport = () => {
-    router.push("/creators/dashboard?view=sample-report")
+    router.push("/sample-report")
   }
 
   return (
@@ -109,6 +110,68 @@ export default function CreatorWelcome() {
               <Button variant="outline" onClick={handleViewSampleReport} className="w-full bg-transparent">
                 View Sample Report
               </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 mb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex gap-2">
+                <Sparkles className="h-5 w-5 text-accent" />
+                Demo Success Stories
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Early creators are using the platform to tighten messaging and boost engagement. Here are a few demo
+                outcomes:
+              </p>
+              <ul className="space-y-2">
+                <li className="flex gap-2">
+                  <span className="text-accent">•</span>
+                  <span>Product demo creators cut intro drop-off by 18% after clarity fixes.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-accent">•</span>
+                  <span>Educators improved chapter pacing and saw longer average watch time.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-accent">•</span>
+                  <span>Marketing teams reworked CTAs and lifted click-through on launch videos.</span>
+                </li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex gap-2">
+                <Coins className="h-5 w-5 text-accent" />
+                Credits + Add-ons
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                Credits are used for submissions. Your plan loads credits into your account, and a standard video uses
+                5 credits.
+              </p>
+              <p>
+                Add-ons are ready at upload and are billed in USD (not credits). They add extra value like more
+                reviewers, faster delivery, full-watch summaries, or a live feedback session.
+              </p>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Package className="h-4 w-4 text-accent" />
+                <span>Select add-ons during submission to enhance the report.</span>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button variant="outline" className="bg-transparent" asChild>
+                  <Link href="/creators/dashboard?section=credits">View Credits</Link>
+                </Button>
+                <Button variant="outline" className="bg-transparent" asChild>
+                  <Link href="/creators/dashboard?section=addons">View Add-ons</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

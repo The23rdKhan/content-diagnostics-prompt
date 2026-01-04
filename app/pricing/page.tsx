@@ -21,6 +21,7 @@ export default function PricingPage() {
       reviewers: "5",
       features: [
         "5 reviewers per video",
+        "15 credits per month",
         "AI diagnostics included",
         "Asynchronous human feedback",
         "48-hour turnaround",
@@ -37,6 +38,7 @@ export default function PricingPage() {
       reviewers: "10",
       features: [
         "10 reviewers per video",
+        "50 credits per month",
         "AI diagnostics included",
         "Asynchronous human feedback",
         "24-hour turnaround",
@@ -54,6 +56,7 @@ export default function PricingPage() {
       reviewers: "15",
       features: [
         "15 reviewers per video",
+        "250 credits per month",
         "AI diagnostics included",
         "Asynchronous human feedback",
         "12-hour turnaround",
@@ -148,6 +151,30 @@ export default function PricingPage() {
                   </Button>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Pay-as-you-go */}
+        <section className="py-20 lg:py-32">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-3xl text-center mb-12">
+              <h2 className="text-3xl font-bold text-foreground">Pay-as-you-go</h2>
+              <p className="mt-4 text-muted-foreground">
+                Prefer to buy credits as you need them? Use credits to pay per video.
+              </p>
+            </div>
+            <div className="mx-auto max-w-3xl rounded-xl border border-border bg-card p-8 text-center">
+              <div className="text-4xl font-bold text-accent">5 credits</div>
+              <p className="mt-2 text-sm text-muted-foreground">covers up to 60 minutes</p>
+              <div className="mt-4 text-sm text-muted-foreground">
+                +1 credit per additional 30 minutes
+              </div>
+              <div className="mt-6">
+                <Button variant="outline" asChild>
+                  <Link href="/auth/sign-up">Start with credits</Link>
+                </Button>
+              </div>
             </div>
           </div>
         </section>

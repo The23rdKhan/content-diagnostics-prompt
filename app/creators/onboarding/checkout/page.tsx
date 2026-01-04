@@ -29,8 +29,10 @@ export default function CreatorCheckout() {
   // Guard: Ensure user has selected a plan before accessing checkout
   useEffect(() => {
     const plan = sessionStorage.getItem("selected_plan")
+    const isValidPlan = plan ? CREATOR_PLANS.some((p) => p.id === plan) : false
 
-    if (!plan) {
+    if (!plan || !isValidPlan) {
+      sessionStorage.removeItem("selected_plan")
       router.replace("/creators/onboarding/plan")
     } else {
       setSelectedPlan(plan)
@@ -124,7 +126,10 @@ export default function CreatorCheckout() {
                 <div>
                   <h3 className="font-semibold">{plan?.name} Plan</h3>
                   <p className="text-sm text-muted-foreground">
-                    {plan?.reviewersPerVideo} reviewers • {plan?.deliveryDays}-day delivery
+                    {plan?.reviewersPerVideo} reviewers • {plan?.deliveryDays}-day delivery • {plan?.videosPerMonth} videos/mo
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Includes {plan?.monthlyCredits} credits per month
                   </p>
                   <div className="text-xl font-bold text-accent mt-2">${plan?.price}/mo</div>
                 </div>

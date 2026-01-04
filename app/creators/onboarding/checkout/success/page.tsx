@@ -50,18 +50,18 @@ function CheckoutSuccessContent() {
 
     // Auto-redirect countdown
     const timer = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(timer)
-          router.push("/creators/onboarding/welcome")
-          return 0
-        }
-        return c - 1
-      })
+      setCountdown((c) => Math.max(c - 1, 0))
     }, 1000)
 
     return () => clearInterval(timer)
   }, [router, activating])
+
+  useEffect(() => {
+    if (activating) return
+    if (countdown <= 0) {
+      router.push("/creators/onboarding/welcome")
+    }
+  }, [router, activating, countdown])
 
   return (
     <div className="min-h-screen bg-background py-12">
@@ -86,7 +86,8 @@ function CheckoutSuccessContent() {
             </div>
             <CardTitle className="text-2xl">Payment Successful!</CardTitle>
             <CardDescription className="text-base">
-              Your subscription is now active. You&apos;re ready to start getting feedback on your content.
+              Your subscription is now active and your plan credits are loaded. You&apos;re ready to start getting
+              feedback on your content.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
