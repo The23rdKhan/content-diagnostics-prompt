@@ -114,4 +114,28 @@ public interface JobRepository extends JpaRepository<Job, Long> {
      */
     @Query("SELECT COUNT(j) FROM Job j WHERE j.creator = :creator AND j.createdAt >= :since")
     long countByCreatorSince(@Param("creator") User creator, @Param("since") Instant since);
+
+    /**
+     * Count jobs delivered since a given time (for daily stats).
+     */
+    @Query("SELECT COUNT(j) FROM Job j WHERE j.status = 'DELIVERED' AND j.deliveredAt >= :since")
+    long countDeliveredSince(@Param("since") Instant since);
+
+    /**
+     * Get average delivery time in hours for jobs delivered since a given time.
+     */
+    @Query("SELECT COALESCE(AVG(j.deliveryTimeHours), 0) FROM Job j WHERE j.status = 'DELIVERED' AND j.deliveredAt >= :since")
+    Double getAverageDeliveryTime(@Param("since") Instant since);
+
+    /**
+     * Count jobs delivered on time (before SLA deadline) since a given time.
+     */
+    @Query("SELECT COUNT(j) FROM Job j WHERE j.status = 'DELIVERED' AND j.deliveredAt <= j.slaDeadline AND j.deliveredAt >= :since")
+    long countOnTimeDeliveries(@Param("since") Instant since);
+
+    /**
+     * Count total delivered jobs since a given time (for SLA rate calculation).
+     */
+    @Query("SELECT COUNT(j) FROM Job j WHERE j.status = 'DELIVERED' AND j.deliveredAt >= :since")
+    long countTotalDeliveredSince(@Param("since") Instant since);
 }

@@ -3,9 +3,12 @@ package com.contentdiagnostics.auth.service;
 import com.contentdiagnostics.auth.dto.AuthResponse;
 import com.contentdiagnostics.auth.dto.LoginRequest;
 import com.contentdiagnostics.auth.dto.SignUpRequest;
+import com.contentdiagnostics.auth.entity.EmailVerificationToken;
 import com.contentdiagnostics.auth.entity.RefreshToken;
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.auth.entity.UserRole;
+import com.contentdiagnostics.auth.repository.EmailVerificationTokenRepository;
+import com.contentdiagnostics.auth.repository.PasswordResetTokenRepository;
 import com.contentdiagnostics.auth.repository.RefreshTokenRepository;
 import com.contentdiagnostics.auth.repository.UserRepository;
 import com.contentdiagnostics.common.exception.BadRequestException;
@@ -51,6 +54,12 @@ class AuthServiceTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     @Mock
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Mock
+    private EmailVerificationTokenRepository emailVerificationTokenRepository;
+
+    @Mock
     private CreatorProfileRepository creatorProfileRepository;
 
     @Mock
@@ -81,6 +90,7 @@ class AuthServiceTest {
     void setUp() {
         // Set the initial quality score field
         ReflectionTestUtils.setField(authService, "initialQualityScore", 100);
+        ReflectionTestUtils.setField(authService, "baseUrl", "http://localhost:3000");
 
         signUpRequest = new SignUpRequest();
         signUpRequest.setEmail("test@example.com");
@@ -122,6 +132,7 @@ class AuthServiceTest {
             when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(3600L);
             when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(creatorProfileRepository.save(any(CreatorProfile.class))).thenAnswer(i -> i.getArgument(0));
+            when(emailVerificationTokenRepository.save(any(EmailVerificationToken.class))).thenAnswer(i -> i.getArgument(0));
 
             AuthResponse response = authService.signUp(signUpRequest, userAgent, ipAddress);
 
@@ -132,6 +143,7 @@ class AuthServiceTest {
 
             verify(userRepository).save(any(User.class));
             verify(creatorProfileRepository).save(any(CreatorProfile.class));
+            verify(emailVerificationTokenRepository).save(any(EmailVerificationToken.class));
         }
 
         @Test
@@ -152,6 +164,7 @@ class AuthServiceTest {
             when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(3600L);
             when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(reviewerProfileRepository.save(any(ReviewerProfile.class))).thenAnswer(i -> i.getArgument(0));
+            when(emailVerificationTokenRepository.save(any(EmailVerificationToken.class))).thenAnswer(i -> i.getArgument(0));
 
             AuthResponse response = authService.signUp(signUpRequest, userAgent, ipAddress);
 
@@ -197,6 +210,7 @@ class AuthServiceTest {
             when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(3600L);
             when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(creatorProfileRepository.save(any(CreatorProfile.class))).thenAnswer(i -> i.getArgument(0));
+            when(emailVerificationTokenRepository.save(any(EmailVerificationToken.class))).thenAnswer(i -> i.getArgument(0));
 
             authService.signUp(signUpRequest, userAgent, ipAddress);
 
@@ -224,6 +238,7 @@ class AuthServiceTest {
             when(jwtService.getAccessTokenExpirationSeconds()).thenReturn(3600L);
             when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> i.getArgument(0));
             when(reviewerProfileRepository.save(any(ReviewerProfile.class))).thenAnswer(i -> i.getArgument(0));
+            when(emailVerificationTokenRepository.save(any(EmailVerificationToken.class))).thenAnswer(i -> i.getArgument(0));
 
             authService.signUp(signUpRequest, userAgent, ipAddress);
 

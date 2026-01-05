@@ -106,10 +106,50 @@ app:
   qualification:
     min-completion-time-seconds: 60
     passing-threshold: 0.80
-    # Expected answers can be configured via environment or properties
-    # expected-answers:
-    #   q1: "correct_answer"
-    #   q2: "correct_answer"
+    max-attempts: 3
+    retry-cooldown-hours: 24
+    # Sample qualification test questions
+    questions:
+      - id: q1
+        text: "What should you do if you see inappropriate or offensive content in a video?"
+        options:
+          - "Ignore it and continue reviewing"
+          - "Flag and report the content immediately"
+          - "Give the video a low rating without reporting"
+          - "Stop reviewing and wait for instructions"
+        answer: "Flag and report the content immediately"
+      - id: q2
+        text: "What is the minimum amount of time you should watch a video segment before rating it?"
+        options:
+          - "10 seconds"
+          - "30 seconds"
+          - "1 minute"
+          - "The entire video"
+        answer: "30 seconds"
+      - id: q3
+        text: "When providing feedback on a video, you should:"
+        options:
+          - "Only focus on negative aspects"
+          - "Be vague to save time"
+          - "Provide specific, constructive feedback"
+          - "Copy feedback from previous reviews"
+        answer: "Provide specific, constructive feedback"
+      - id: q4
+        text: "If you cannot complete a task within the time limit, what should you do?"
+        options:
+          - "Submit incomplete work"
+          - "Let the task expire so it returns to the queue"
+          - "Ask another reviewer to help"
+          - "Extend the time limit yourself"
+        answer: "Let the task expire so it returns to the queue"
+      - id: q5
+        text: "What is the most important quality in a video review?"
+        options:
+          - "Speed of completion"
+          - "Accuracy and honesty"
+          - "Giving high ratings to all videos"
+          - "Matching other reviewers' opinions"
+        answer: "Accuracy and honesty"
   cookie:
     # HttpOnly cookie settings for refresh tokens
     secure: ${COOKIE_SECURE:false}  # true in production (HTTPS only)

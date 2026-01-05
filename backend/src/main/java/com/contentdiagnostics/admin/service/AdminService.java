@@ -83,16 +83,35 @@ public class AdminService {
         List<JobStatus> inProgressStatuses = List.of(JobStatus.PROCESSING, JobStatus.IN_REVIEW, JobStatus.COMPILING);
         long jobsInProgress = jobRepository.countByStatusIn(inProgressStatuses);
 
+        // Calculate daily stats
+        Instant startOfToday = LocalDate.now(ZoneId.of("UTC"))
+                .atStartOfDay(ZoneId.of("UTC"))
+                .toInstant();
+
+        long tasksCompletedToday = taskRepository.countApprovedSince(startOfToday);
+        long jobsDeliveredToday = jobRepository.countDeliveredSince(startOfToday);
+
+        // Calculate average delivery time (last 30 days)
+        Instant thirtyDaysAgo = Instant.now().minus(30, java.time.temporal.ChronoUnit.DAYS);
+        Double avgDeliveryTime = jobRepository.getAverageDeliveryTime(thirtyDaysAgo);
+
+        // Calculate SLA compliance rate (last 30 days)
+        long onTimeDeliveries = jobRepository.countOnTimeDeliveries(thirtyDaysAgo);
+        long totalDelivered = jobRepository.countTotalDeliveredSince(thirtyDaysAgo);
+        double slaComplianceRate = totalDelivered > 0
+                ? (double) onTimeDeliveries / totalDelivered
+                : 1.0; // Default to 100% if no deliveries yet
+
         return KpiResponse.builder()
                 .totalCreators(totalCreators)
                 .totalReviewers(totalReviewers)
                 .activeReviewers(activeReviewers)
                 .pendingTasks(pendingTasks)
-                .tasksCompletedToday(0L) // TODO: Implement daily stats
+                .tasksCompletedToday(tasksCompletedToday)
                 .jobsInProgress(jobsInProgress)
-                .jobsDeliveredToday(0L) // TODO: Implement daily stats
-                .avgDeliveryTimeHours(36.0) // TODO: Calculate from actual data
-                .slaComplianceRate(0.95) // TODO: Calculate from actual data
+                .jobsDeliveredToday(jobsDeliveredToday)
+                .avgDeliveryTimeHours(avgDeliveryTime != null ? avgDeliveryTime : 0.0)
+                .slaComplianceRate(slaComplianceRate)
                 .build();
     }
 

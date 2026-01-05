@@ -189,6 +189,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     long countByStatus(TaskStatus status);
 
     /**
+     * Count approved tasks since a given time (for daily stats).
+     */
+    @Query("SELECT COUNT(t) FROM Task t WHERE t.status = 'APPROVED' AND t.reviewedAt >= :since")
+    long countApprovedSince(@Param("since") Instant since);
+
+    /**
      * Find tasks by job and status.
      */
     List<Task> findByJobAndStatus(Job job, TaskStatus status);

@@ -28,6 +28,8 @@ public class EmailTemplateService {
         return switch (type) {
             // Common
             case WELCOME -> generateWelcomeEmail(context);
+            case PASSWORD_RESET -> generatePasswordResetEmail(context);
+            case EMAIL_VERIFICATION -> generateEmailVerificationEmail(context);
 
             // Creator notifications
             case UPLOAD_RECEIVED -> generateUploadReceivedEmail(context);
@@ -79,6 +81,30 @@ public class EmailTemplateService {
                     baseUrl + "/reviewers/qualification"
             );
         }
+    }
+
+    private EmailContent generatePasswordResetEmail(Map<String, Object> context) {
+        String resetLink = getString(context, "resetLink", baseUrl + "/auth/reset-password");
+
+        return new EmailContent(
+                "Reset your password",
+                "Password Reset Request",
+                "You requested to reset your password. Click the link below to create a new password. " +
+                "This link expires in 1 hour. If you didn't request this, you can safely ignore this email.",
+                resetLink
+        );
+    }
+
+    private EmailContent generateEmailVerificationEmail(Map<String, Object> context) {
+        String verifyLink = getString(context, "verifyLink", baseUrl + "/auth/verify-email");
+
+        return new EmailContent(
+                "Verify your email address",
+                "Verify Your Email",
+                "Thanks for signing up! Please verify your email address to complete your registration. " +
+                "Click the link below to confirm your email. This link expires in 24 hours.",
+                verifyLink
+        );
     }
 
     // --- Creator Notifications ---

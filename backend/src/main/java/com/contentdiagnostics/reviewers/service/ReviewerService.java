@@ -5,7 +5,9 @@ import com.contentdiagnostics.common.exception.BadRequestException;
 import com.contentdiagnostics.common.exception.ResourceNotFoundException;
 import com.contentdiagnostics.reviewers.config.QualificationConfig;
 import com.contentdiagnostics.reviewers.dto.*;
+import com.contentdiagnostics.reviewers.entity.QualificationSubmission;
 import com.contentdiagnostics.reviewers.entity.ReviewerProfile;
+import com.contentdiagnostics.reviewers.repository.QualificationSubmissionRepository;
 import com.contentdiagnostics.reviewers.repository.ReviewerProfileRepository;
 import com.contentdiagnostics.tasks.repository.TaskRepository;
 import com.contentdiagnostics.common.service.EncryptionService;
@@ -18,8 +20,10 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Service for reviewer operations.
@@ -30,6 +34,7 @@ import java.util.List;
 public class ReviewerService {
 
     private final ReviewerProfileRepository profileRepository;
+    private final QualificationSubmissionRepository qualificationSubmissionRepository;
     private final TaskRepository taskRepository;
     private final QualificationConfig qualificationConfig;
     private final EncryptionService encryptionService;
@@ -69,6 +74,69 @@ public class ReviewerService {
     }
 
     /**
+     * Get qualification test with eligibility status.
+     */
+    @Transactional(readOnly = true)
+    public QualificationTestResponse getQualificationTest(User user) {
+        ReviewerProfile profile = getProfileEntity(user);
+
+        // Check if already passed
+        if (profile.isQualificationPassed()) {
+            return QualificationTestResponse.builder()
+                    .eligible(false)
+                    .message("You have already passed the qualification test.")
+                    .attemptsRemaining(0)
+                    .build();
+        }
+
+        // Check attempt count
+        long attemptCount = qualificationSubmissionRepository.countByUser(user);
+        int maxAttempts = qualificationConfig.getMaxAttempts();
+        int attemptsRemaining = (int) Math.max(0, maxAttempts - attemptCount);
+
+        if (attemptsRemaining <= 0) {
+            return QualificationTestResponse.builder()
+                    .eligible(false)
+                    .message("You have reached the maximum number of attempts.")
+                    .attemptsRemaining(0)
+                    .build();
+        }
+
+        // Check cooldown after last failure
+        var lastFailed = qualificationSubmissionRepository.findMostRecentFailedSubmission(user);
+        if (lastFailed.isPresent()) {
+            Instant cooldownEnd = lastFailed.get().getSubmittedAt()
+                    .plus(qualificationConfig.getRetryCooldownHours(), ChronoUnit.HOURS);
+            if (Instant.now().isBefore(cooldownEnd)) {
+                return QualificationTestResponse.builder()
+                        .eligible(false)
+                        .message("Please wait before retrying the qualification test.")
+                        .attemptsRemaining(attemptsRemaining)
+                        .canRetryAt(cooldownEnd)
+                        .build();
+            }
+        }
+
+        // User is eligible - return the test
+        List<QualificationTestResponse.Question> questions = qualificationConfig.getQuestions().stream()
+                .map(q -> QualificationTestResponse.Question.builder()
+                        .id(q.getId())
+                        .text(q.getText())
+                        .options(q.getOptions())
+                        .build())
+                .collect(Collectors.toList());
+
+        return QualificationTestResponse.builder()
+                .eligible(true)
+                .message("You are eligible to take the qualification test.")
+                .attemptsRemaining(attemptsRemaining)
+                .minCompletionTimeSeconds(qualificationConfig.getMinCompletionTimeSeconds())
+                .passingThreshold(qualificationConfig.getPassingThreshold())
+                .questions(questions)
+                .build();
+    }
+
+    /**
      * Submit qualification test.
      */
     @Transactional
@@ -79,18 +147,57 @@ public class ReviewerService {
             throw new BadRequestException("Qualification already passed");
         }
 
-        // TODO: Implement actual qualification test logic
-        // For MVP, automatically pass if submission is received
-        boolean passed = evaluateQualification(request);
+        // Check attempt count
+        long attemptCount = qualificationSubmissionRepository.countByUser(user);
+        int maxAttempts = qualificationConfig.getMaxAttempts();
 
-        if (passed) {
+        if (attemptCount >= maxAttempts) {
+            throw new BadRequestException("Maximum attempts reached. Contact support for assistance.");
+        }
+
+        // Check cooldown after last failure
+        var lastFailed = qualificationSubmissionRepository.findMostRecentFailedSubmission(user);
+        if (lastFailed.isPresent()) {
+            Instant cooldownEnd = lastFailed.get().getSubmittedAt()
+                    .plus(qualificationConfig.getRetryCooldownHours(), ChronoUnit.HOURS);
+            if (Instant.now().isBefore(cooldownEnd)) {
+                throw new BadRequestException("Please wait " + qualificationConfig.getRetryCooldownHours() +
+                        " hours before retrying the qualification test.");
+            }
+        }
+
+        // Evaluate the submission
+        QualificationConfig.EvaluationResult result = qualificationConfig.evaluateDetailed(
+                request.getAnswers(),
+                request.getCompletionTimeSeconds()
+        );
+
+        // Record the submission
+        QualificationSubmission submission = QualificationSubmission.builder()
+                .user(user)
+                .answers(request.getAnswers())
+                .completionTimeSeconds(request.getCompletionTimeSeconds())
+                .score(result.score())
+                .correctCount(result.correctCount())
+                .totalQuestions(result.totalQuestions())
+                .passed(result.passed())
+                .attemptNumber((int) attemptCount + 1)
+                .build();
+        qualificationSubmissionRepository.save(submission);
+
+        log.info("Qualification submission recorded: user={}, passed={}, score={}, attempt={}",
+                user.getId(), result.passed(), result.score(), attemptCount + 1);
+
+        if (result.passed()) {
             profileRepository.passQualification(profile.getId());
             profile.setQualificationPassed(true);
             profile.setQueueLocked(false);
-            log.info("Reviewer {} passed qualification", user.getId());
+            log.info("Reviewer {} passed qualification on attempt {}", user.getId(), attemptCount + 1);
         } else {
-            log.info("Reviewer {} failed qualification", user.getId());
-            throw new BadRequestException("Qualification test not passed. Please try again.");
+            String reason = result.tooFast()
+                    ? "Test completed too quickly. Please take your time to read each question carefully."
+                    : "Not enough correct answers. You scored " + Math.round(result.score() * 100) + "%.";
+            throw new BadRequestException(reason);
         }
 
         return mapToDto(profile, user.getEmail());
@@ -170,23 +277,6 @@ public class ReviewerService {
     private ReviewerProfile getProfileEntity(User user) {
         return profileRepository.findByUser(user)
                 .orElseThrow(() -> new ResourceNotFoundException("Reviewer profile", user.getId().toString()));
-    }
-
-    private boolean evaluateQualification(QualificationSubmissionRequest request) {
-        if (request.getAnswers() == null || request.getAnswers().isEmpty()) {
-            log.warn("Qualification submission has no answers");
-            return false;
-        }
-
-        boolean passed = qualificationConfig.evaluate(
-                request.getAnswers(),
-                request.getCompletionTimeSeconds()
-        );
-
-        log.info("Qualification evaluation: passed={}, completionTime={}s, answersCount={}",
-                passed, request.getCompletionTimeSeconds(), request.getAnswers().size());
-
-        return passed;
     }
 
     private ReviewerProfileDto mapToDto(ReviewerProfile profile, String email) {

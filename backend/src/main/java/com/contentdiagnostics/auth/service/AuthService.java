@@ -1,9 +1,13 @@
 package com.contentdiagnostics.auth.service;
 
 import com.contentdiagnostics.auth.dto.*;
+import com.contentdiagnostics.auth.entity.EmailVerificationToken;
+import com.contentdiagnostics.auth.entity.PasswordResetToken;
 import com.contentdiagnostics.auth.entity.RefreshToken;
 import com.contentdiagnostics.auth.entity.User;
 import com.contentdiagnostics.auth.entity.UserRole;
+import com.contentdiagnostics.auth.repository.EmailVerificationTokenRepository;
+import com.contentdiagnostics.auth.repository.PasswordResetTokenRepository;
 import com.contentdiagnostics.auth.repository.RefreshTokenRepository;
 import com.contentdiagnostics.auth.repository.UserRepository;
 import com.contentdiagnostics.common.exception.BadRequestException;
@@ -26,8 +30,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Service handling authentication operations.
@@ -39,6 +45,8 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final CreatorProfileRepository creatorProfileRepository;
     private final ReviewerProfileRepository reviewerProfileRepository;
     private final PasswordEncoder passwordEncoder;
@@ -48,6 +56,9 @@ public class AuthService {
 
     @Value("${app.reviewer.initial-quality-score:100}")
     private int initialQualityScore;
+
+    @Value("${app.base-url:http://localhost:3000}")
+    private String baseUrl;
 
     /**
      * Register a new user.
@@ -90,6 +101,9 @@ public class AuthService {
                 NotificationType.WELCOME,
                 Map.of("role", user.getRole().name())
         );
+
+        // Send email verification
+        sendVerificationEmail(user);
 
         log.info("New user registered: {} as {}", user.getEmail(), user.getRole());
 
@@ -187,6 +201,136 @@ public class AuthService {
         }
 
         return builder.build();
+    }
+
+    // --- Password Reset ---
+
+    /**
+     * Initiate password reset for an email address.
+     * Silently succeeds even if email doesn't exist (prevents enumeration).
+     */
+    @Transactional
+    public void forgotPassword(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            // Invalidate any existing tokens for this user
+            passwordResetTokenRepository.invalidateAllForUser(user);
+
+            // Generate new token
+            String token = UUID.randomUUID().toString();
+            PasswordResetToken resetToken = PasswordResetToken.builder()
+                    .token(token)
+                    .user(user)
+                    .expiresAt(Instant.now().plus(1, ChronoUnit.HOURS))
+                    .build();
+
+            passwordResetTokenRepository.save(resetToken);
+
+            // Send password reset email
+            String resetLink = baseUrl + "/auth/reset-password?token=" + token;
+            notificationService.createNotification(
+                    user,
+                    NotificationType.PASSWORD_RESET,
+                    Map.of("resetLink", resetLink)
+            );
+
+            log.info("Password reset token generated for user: {}", user.getId());
+        });
+    }
+
+    /**
+     * Reset password using a valid token.
+     */
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+                .orElseThrow(() -> new BadRequestException("Invalid or expired reset token", "INVALID_TOKEN"));
+
+        if (!resetToken.isValid()) {
+            throw new BadRequestException("Reset token has expired or already been used", "TOKEN_EXPIRED");
+        }
+
+        User user = resetToken.getUser();
+
+        // Update password
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Mark token as used
+        resetToken.setUsed(true);
+        passwordResetTokenRepository.save(resetToken);
+
+        // Revoke all refresh tokens (log out from all devices)
+        refreshTokenRepository.revokeAllUserTokens(user);
+
+        log.info("Password reset completed for user: {}", user.getId());
+    }
+
+    // --- Email Verification ---
+
+    /**
+     * Verify user's email using a valid token.
+     */
+    @Transactional
+    public void verifyEmail(String token) {
+        EmailVerificationToken verificationToken = emailVerificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new BadRequestException("Invalid or expired verification token", "INVALID_TOKEN"));
+
+        if (!verificationToken.isValid()) {
+            throw new BadRequestException("Verification token has expired or already been used", "TOKEN_EXPIRED");
+        }
+
+        User user = verificationToken.getUser();
+
+        // Mark email as verified
+        user.setEmailVerified(true);
+        userRepository.save(user);
+
+        // Mark token as used
+        verificationToken.setUsed(true);
+        emailVerificationTokenRepository.save(verificationToken);
+
+        log.info("Email verified for user: {}", user.getId());
+    }
+
+    /**
+     * Resend verification email if user hasn't verified yet.
+     */
+    @Transactional
+    public void resendVerification(User user) {
+        if (user.isEmailVerified()) {
+            throw new BadRequestException("Email is already verified", "ALREADY_VERIFIED");
+        }
+
+        // Invalidate existing tokens
+        emailVerificationTokenRepository.invalidateAllForUser(user);
+
+        // Send new verification email
+        sendVerificationEmail(user);
+
+        log.info("Verification email resent for user: {}", user.getId());
+    }
+
+    /**
+     * Send verification email to user.
+     */
+    private void sendVerificationEmail(User user) {
+        // Generate verification token
+        String token = UUID.randomUUID().toString();
+        EmailVerificationToken verificationToken = EmailVerificationToken.builder()
+                .token(token)
+                .user(user)
+                .expiresAt(Instant.now().plus(24, ChronoUnit.HOURS))
+                .build();
+
+        emailVerificationTokenRepository.save(verificationToken);
+
+        // Send email verification notification
+        String verifyLink = baseUrl + "/auth/verify-email?token=" + token;
+        notificationService.createNotification(
+                user,
+                NotificationType.EMAIL_VERIFICATION,
+                Map.of("verifyLink", verifyLink)
+        );
     }
 
     // --- Helper methods ---

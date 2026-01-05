@@ -130,8 +130,8 @@ public class NotificationEventListener {
         }
 
         return switch (type) {
-            // Common
-            case WELCOME -> true; // Always send welcome emails
+            // Common - always send these transactional emails
+            case WELCOME, PASSWORD_RESET, EMAIL_VERIFICATION -> true;
 
             // Creator notifications
             case REPORT_READY -> prefs.getReportReady();

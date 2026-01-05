@@ -58,6 +58,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
                         .requestMatchers("/auth/signup", "/auth/login", "/auth/refresh").permitAll()
+                        .requestMatchers("/auth/forgot-password", "/auth/reset-password", "/auth/verify-email").permitAll()
                         .requestMatchers("/webhooks/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

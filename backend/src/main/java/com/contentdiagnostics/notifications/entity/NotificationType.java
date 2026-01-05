@@ -6,6 +6,8 @@ package com.contentdiagnostics.notifications.entity;
 public enum NotificationType {
     // Common notifications
     WELCOME,
+    PASSWORD_RESET,
+    EMAIL_VERIFICATION,
 
     // Creator notifications
     UPLOAD_RECEIVED,

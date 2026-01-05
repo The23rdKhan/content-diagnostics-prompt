@@ -58,6 +58,20 @@ public class ReviewerController {
     }
 
     /**
+     * Get qualification test.
+     * GET /api/reviewer/qualification/test
+     *
+     * Returns test questions and eligibility status.
+     */
+    @GetMapping("/qualification/test")
+    public ResponseEntity<ApiResponse<QualificationTestResponse>> getQualificationTest() {
+        User user = SecurityUtils.getCurrentUser();
+        QualificationTestResponse test = reviewerService.getQualificationTest(user);
+
+        return ResponseEntity.ok(ApiResponse.success(test));
+    }
+
+    /**
      * Submit qualification test.
      * POST /api/reviewer/qualification/submit
      */

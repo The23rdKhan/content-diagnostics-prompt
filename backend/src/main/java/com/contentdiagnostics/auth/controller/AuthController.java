@@ -165,6 +165,66 @@ public class AuthController {
     }
 
     /**
+     * Request password reset.
+     * POST /api/auth/forgot-password
+     *
+     * Sends password reset email if email exists.
+     * Always returns success to prevent email enumeration.
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+
+        log.info("Password reset requested for email: {}", request.getEmail());
+        authService.forgotPassword(request.getEmail());
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "If an account with that email exists, we've sent password reset instructions."));
+    }
+
+    /**
+     * Reset password with token.
+     * POST /api/auth/reset-password
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+
+        log.info("Password reset attempt with token");
+        authService.resetPassword(request.getToken(), request.getNewPassword());
+
+        return ResponseEntity.ok(ApiResponse.success("Password has been reset successfully. You can now log in."));
+    }
+
+    /**
+     * Verify email address with token.
+     * GET /api/auth/verify-email?token=xxx
+     */
+    @GetMapping("/verify-email")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
+        log.info("Email verification attempt with token");
+        authService.verifyEmail(token);
+
+        return ResponseEntity.ok(ApiResponse.success("Email verified successfully. Thank you!"));
+    }
+
+    /**
+     * Resend verification email.
+     * POST /api/auth/resend-verification
+     *
+     * Requires authentication.
+     */
+    @PostMapping("/resend-verification")
+    public ResponseEntity<ApiResponse<Void>> resendVerification() {
+        User user = SecurityUtils.getCurrentUser();
+
+        log.info("Resend verification request for user: {}", user.getId());
+        authService.resendVerification(user);
+
+        return ResponseEntity.ok(ApiResponse.success("Verification email sent. Please check your inbox."));
+    }
+
+    /**
      * Extract client IP address from request.
      */
     private String getClientIp(HttpServletRequest request) {
